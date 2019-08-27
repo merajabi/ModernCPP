@@ -41,18 +41,18 @@ namespace ModernCPP {
 
 			~thread(){
 				if(status){
-					Join();
+					join();
 					//Detach();
 				}
 				delete data;
 			}
-			void Join(){
+			void join(){
 				if(status){
 					pthread_join( threadId, NULL);
 					status=false;
 				}
 			}
-			void Detach() {
+			void detach() {
 				if(status){
 					pthread_detach(threadId);
 					status=false;

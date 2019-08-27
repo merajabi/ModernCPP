@@ -3,14 +3,16 @@
 #include "mutex.h"
 #include "atomic.h"
 
-ModernCPP::mutex m;
-ModernCPP::atomic<unsigned long> counter(0);
+using namespace ModernCPP;
+
+mutex m;
+atomic<unsigned long> counter(0);
 
 int inc(std::string x) {
 	while(1){
 		unsigned long tmp = counter.Load();
 		if(tmp<10000ul) {
-			ModernCPP::lock_guard lk(m);
+			lock_guard lk(m);
 			tmp = counter.Load();
 			if(tmp<10000ul){
 				tmp++;
@@ -49,9 +51,9 @@ int main() {
 	Test obj;
 	int (*fp)(std::string) = inc;
 	{
-		ModernCPP::thread t1(obj);
-		ModernCPP::thread t2(inc,"5");
-		ModernCPP::thread t3(fp,"5");
+		thread t1(obj);
+		thread t2(inc,"5");
+		thread t3(fp,"5");
 		//t3.Join();
 		//t2.Join();
 		//t1.Join();

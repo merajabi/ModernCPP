@@ -12,30 +12,39 @@ namespace ModernCPP {
 			~mutex(){
 			    pthread_mutex_destroy(&m); 
 			}
-			void Lock(){
+			void lock(){
 				if(pthread_mutex_lock( &m )==0){
 					status = LOCKED;
 				}
 			}
-			void Unlock(){
+			void unlock(){
 				if(pthread_mutex_unlock( &m )==0){
 					status = UNLOCKED;
 				}
 			}
 			LockStatus GetStatus() {return status;}
 	};
+	template<typename T>
 	class lock_guard {
-		mutex &m;
+		T &m;
+		lock_guard(const lock_guard &pg);
+		lock_guard& operator= (const lock_guard &pg);
+		lock_guard(lock_guard &pg);
+		lock_guard& operator= (lock_guard &pg);
 		public:
-		lock_guard(mutex& m):m(m){
-			m.Lock();
+		lock_guard(T& m):m(m){
+			m.lock();
 		}
 		~lock_guard(){
-			m.Unlock();
+			m.unlock();
+		}
+		T& operator ->() {
+			return m;
+		}
+		T& operator ->() const {
+			return m;
 		}
 	};
-
-
 };
 
 

@@ -25,13 +25,13 @@ namespace ModernCPP {
 		    return *this;
 		}
 
-		T Load(){
+		T load(){
 			__sync_synchronize();   // (I)
 			T val = obj;
 			__sync_synchronize();   // (II)
 			return val;
 		}
-		void Store(const T& val){
+		void store(const T& val){
 			__sync_synchronize();   // (I)
 		    obj = val;
 			__sync_synchronize();   // (II)
