@@ -18,7 +18,7 @@ namespace ModernCPP {
 			return tmp;
 		}
 
-		Atomic<T>& operator=( const T& val ) {
+		atomic<T>& operator=( const T& val ) {
 			__sync_synchronize();   // (I)
 		    obj = val;
 			__sync_synchronize();   // (II)
