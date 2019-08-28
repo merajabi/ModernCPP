@@ -1,3 +1,6 @@
+#ifndef _ModernCPP_mutex_H_
+#define _ModernCPP_mutex_H_
+
 namespace ModernCPP {
 	class mutex {
 		typedef enum {INIT,LOCKED,UNLOCKED} LockStatus;
@@ -47,6 +50,6 @@ namespace ModernCPP {
 	};
 };
 
-
+#endif //_ModernCPP_mutex_H_
 
 

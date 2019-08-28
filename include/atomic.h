@@ -1,3 +1,6 @@
+#ifndef _ModernCPP_atomic_H_
+#define _ModernCPP_atomic_H_
+
 namespace ModernCPP {
 	template < typename T >
 	class atomic {
@@ -69,4 +72,6 @@ namespace ModernCPP {
 
 	};
 };
+
+#endif //_ModernCPP_atomic_H_
 

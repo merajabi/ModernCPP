@@ -1,6 +1,13 @@
-#include <iostream>
+#ifndef _ModernCPP_SmartGuard_H_
+#define _ModernCPP_SmartGuard_H_
+
 #include <assert.h>
-#define nullptr 0
+#if (__cplusplus < 201103L)
+	#ifndef nullptr
+		#define nullptr NULL
+	#endif
+#endif
+
 namespace ModernCPP {
 	template<typename T>
 	class SmartGuard {
@@ -48,3 +55,5 @@ namespace ModernCPP {
 	};
 	typedef SmartGuard unique_ptr;
 };
+#endif //_ModernCPP_SmartGuard_H_
+

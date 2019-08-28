@@ -1,3 +1,6 @@
+#ifndef _ModernCPP_meta_H_
+#define _ModernCPP_meta_H_
+
 template<bool B, class T = void>
 struct enable_if {};
 
@@ -30,3 +33,6 @@ struct remap < T, typename enable_if< is_same<T, unsigned char>::value
 	}
 };
 */
+
+#endif //_ModernCPP_meta_H_
+

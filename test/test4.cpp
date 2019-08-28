@@ -16,16 +16,16 @@
 #endif 
 
 mutex m;
-atomic<unsigned long> counter(0);
+atomic<unsigned long> counter(10000ul);
 
 int inc(const std::string& x) {
 	while(1){
 		unsigned long tmp = counter.load();
-		if(tmp<10000ul) {
+		if(tmp>0) {
 			lock_guard<mutex> lk(m);
 			tmp = counter.load();
-			if(tmp<10000ul){
-				tmp++;
+			if(tmp>0){
+				tmp--;
 				counter.store(tmp);
 			}
 		} else {

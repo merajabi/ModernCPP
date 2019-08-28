@@ -1,3 +1,8 @@
+#ifndef _ModernCPP_thread_H_
+#define _ModernCPP_thread_H_
+
+#include <pthread.h>
+
 namespace ModernCPP {
 	struct ThreadDataBase {
 		virtual ~ThreadDataBase(){};
@@ -61,3 +66,5 @@ namespace ModernCPP {
 	};
 
 };
+#endif //_ModernCPP_thread_H_
+
