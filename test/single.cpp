@@ -16,8 +16,8 @@
 #endif 
 
 class SafeSingle {
-		//static atomic<SafeSingle*> instance;
-		static SafeSingle* instance;
+		static atomic<SafeSingle*> instance;
+		//static SafeSingle* instance;
 
 		static atomic<long> call_counter;
 		static atomic<long> lock_counter;
@@ -70,8 +70,8 @@ mutex SafeSingle::m;
 atomic<long> SafeSingle::call_counter(0);
 atomic<long> SafeSingle::lock_counter(0);
 
-//atomic<SafeSingle*> SafeSingle::instance(0);
-SafeSingle* SafeSingle::instance(0);
+atomic<SafeSingle*> SafeSingle::instance(0);
+//SafeSingle* SafeSingle::instance(0);
 
 void inc(long x){
 	SafeSingle* safePtr=SafeSingle::GetInstance();
@@ -82,6 +82,7 @@ void inc(long x){
 
 const int numTry=10000;
 const int numThread=5;
+
 int main() {
 	long counter=0;
 	for (int i=0;i<numTry;i++){
@@ -98,5 +99,6 @@ int main() {
 	std::cout << counter << std::endl;
 	std::cout << SafeSingle::GetCallCount() << std::endl;
 	std::cout << SafeSingle::GetLockCount() << std::endl;
+	return 0;
 }
 
