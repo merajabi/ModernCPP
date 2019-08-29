@@ -28,9 +28,9 @@ namespace ModernCPP {
 	};
 
 	class thread {
-		bool status;
-		pthread_t threadId;
-		ThreadDataBase* data ;
+		mutable bool status;
+		mutable pthread_t threadId;
+		mutable ThreadDataBase* data ;
 		public:
 			template<typename FuncType,typename ParamType>
 			thread(FuncType functor,ParamType param):status(false),data( new ThreadData<FuncType,ParamType>(functor,param) ){
@@ -43,7 +43,20 @@ namespace ModernCPP {
 				pthread_create( &threadId, NULL, &ThreadData<FuncType>::function, data);
 				status=true;
 			}
-
+			thread(const thread& t):status(t.status),data(t.data),threadId(t.threadId){
+				t.status=false;
+				t.threadId=-1;
+				t.data=nullptr;
+			}
+			thread& operator = (const thread& t){
+				status=t.status;
+				data=t.data;
+				threadId=t.threadId;
+				t.status=false;
+				t.threadId=-1;
+				t.data=nullptr;
+				return *this;
+			}
 			~thread(){
 				if(status){
 					join();

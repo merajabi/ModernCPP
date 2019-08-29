@@ -38,6 +38,10 @@ namespace ModernCPP {
 			__sync_synchronize();   // (I)
 		    obj = val;
 			__sync_synchronize();   // (II)
+
+			//__sync_lock_test_and_set(&obj,val);
+			//__sync_lock_release (&obj)
+
 		}
 
 		T operator++() {
@@ -62,6 +66,13 @@ namespace ModernCPP {
 
 		T operator-=(const T& val ) {
 		    return __sync_sub_and_fetch( &obj, val );
+		}
+
+		bool operator==(const T& val ) {
+		    return __sync_bool_compare_and_swap( &obj, val, val);
+		}
+		bool operator!=(const T& val ) {
+		    return !__sync_bool_compare_and_swap( &obj, val, val);
 		}
 
 		// Perform an atomic CAS operation
