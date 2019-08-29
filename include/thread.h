@@ -59,8 +59,8 @@ namespace ModernCPP {
 			}
 			~thread(){
 				if(status){
-					join();
-					//Detach();
+					pthread_cancel(threadId);
+					status=false;
 				}
 				delete data;
 			}
@@ -75,6 +75,9 @@ namespace ModernCPP {
 					pthread_detach(threadId);
 					status=false;
 				}
+			}
+			bool joinable(){
+				return status;
 			}					
 	};
 
