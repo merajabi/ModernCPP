@@ -92,7 +92,7 @@ int main() {
 			tv.push_back(thread(inc,10));
 		}
 		for(int j=0;j<tv.size();j++){
-			//tv[j].join();
+			tv[j].join();
 		}
 		counter+=SafeSingle::GetInstance()->GetLocal();
 		SafeSingle::DestroyInstance();

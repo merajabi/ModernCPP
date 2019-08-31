@@ -32,12 +32,12 @@ namespace ModernCPP {
 		mutable pthread_t threadId;
 		mutable ThreadDataBase* data ;
 		public:
+
 			template<typename FuncType,typename ParamType>
 			thread(FuncType functor,ParamType param):status(false),data( new ThreadData<FuncType,ParamType>(functor,param) ){
 				pthread_create( &threadId, NULL, &ThreadData<FuncType,ParamType>::function, data);
 				status=true;
 			}
-
 			template<typename FuncType>
 			thread(FuncType functor):status(false),data( new ThreadData<FuncType>(functor)){
 				pthread_create( &threadId, NULL, &ThreadData<FuncType>::function, data);
