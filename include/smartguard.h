@@ -53,7 +53,15 @@ namespace ModernCPP {
 				return xPtr;
 			}
 	};
-	//typedef SmartGuard unique_ptr;
+
+
+//	template<typename T>
+//	typedef SmartGuard<typename T> unique_ptr<typename T>;
+/*	struct Vector
+	{
+		typedef Matrix<N, 1> type;
+	};
+*/
 };
 #endif //_ModernCPP_SmartGuard_H_
 
