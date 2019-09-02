@@ -46,9 +46,52 @@ namespace ModernCPP {
 	};
 
 	template< class T >
-	T& ref(T& x){
+	T* addressof(T& arg) 
+	{
+		return reinterpret_cast<T*>(
+		           &const_cast<char&>(
+		              reinterpret_cast<const volatile char&>(arg)));
+	}
+
+	template <typename T>
+	class reference_wrapper {
+		T* _ptr;
+	public:
+	  // types
+	  //typedef T type;
+	 
+		reference_wrapper(T& u) : _ptr(ModernCPP::addressof(u)) {};
+
+
+	  //reference_wrapper(const reference_wrapper&) noexcept = default;
+	  // assignment
+	  //reference_wrapper& operator=(const reference_wrapper& x) noexcept = default;
+	 
+	  // access
+		operator T& () const { return *_ptr; }
+		T& get() const { return *_ptr; }
+	 /*
+	  template< class... ArgTypes >
+	  std::invoke_result_t<T&, ArgTypes...>
+		operator() ( ArgTypes&&... args ) const {
+		return std::invoke(get(), std::forward<ArgTypes>(args)...);
+	  }
+	 */
+	};
+	// deduction guides
+	//template<class T>
+	//reference_wrapper(T&) -> reference_wrapper<T>;
+
+	template< typename U >
+	reference_wrapper<U> ref(U& x){
+		return reference_wrapper<U>(x);
+	};
+
+	template< typename U >
+	reference_wrapper<U> ref(reference_wrapper<U> x){
 		return x;
 	};
+
 
 };
 #endif //_ModernCPP_meta_H_
