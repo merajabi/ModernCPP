@@ -53,7 +53,7 @@ namespace ModernCPP {
 				return xPtr;
 			}
 	};
-	typedef SmartGuard unique_ptr;
+	//typedef SmartGuard unique_ptr;
 };
 #endif //_ModernCPP_SmartGuard_H_
 

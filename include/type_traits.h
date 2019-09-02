@@ -1,5 +1,6 @@
 #ifndef _ModernCPP_meta_H_
 #define _ModernCPP_meta_H_
+namespace ModernCPP {
 
 template<bool B, class T = void>
 struct enable_if {};
@@ -17,22 +18,11 @@ struct is_same<A, A> {
     static const bool value = true;
 };
 
-/*
-template < typename T, typename dummy = T >
-struct remap {
-    int foo(int x){
-		return x;
-	}
+template< class T >
+T& ref(T& x){
+	return x;
 };
 
-template < typename T >
-struct remap < T, typename enable_if< is_same<T, unsigned char>::value
-                        			|| is_same<T, signed char>::value, T >::type > {
-    int foo(int x){
-		return x*x;
-	}
 };
-*/
-
 #endif //_ModernCPP_meta_H_
 
