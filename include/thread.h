@@ -13,9 +13,11 @@ namespace ModernCPP {
 	struct ThreadData : public ThreadDataBase {
 		FuncType func;
 		ParamType& param;
-		ThreadData(FuncType func,ParamType& param):func(func),param(param){	std::cout << "T " << "param: " << param <<std::endl;};
+		ThreadData(FuncType func,ParamType& param):func(func),param(param){	
+			//std::cout << "ThreadData: T " << "param: " << param <<std::endl;
+		};
 		static void *function(void *data){
-			std::cout << "function " << "T param: " << ((ThreadData<FuncType,ParamType>*)data)->param <<std::endl;
+			//std::cout << "ThreadData: function " << "T "<<&data<<" param: " << ((ThreadData<FuncType,ParamType>*)data)->param <<std::endl;
 			((ThreadData<FuncType,ParamType>*)data)->func( ((ThreadData<FuncType,ParamType>*)data)->param );
 		}
 	};
@@ -23,10 +25,12 @@ namespace ModernCPP {
 	template<typename FuncType,typename ParamType>
 	struct ThreadData <FuncType, ParamType, typename enable_if< is_same<ParamType, typename add_const<ParamType>::type >::value, ParamType >::type > : public ThreadDataBase {
 		FuncType func;
-		const ParamType& param;
-		ThreadData(FuncType func, ParamType& param):func(func),param(param){std::cout << "const T " << "param: " << param <<std::endl;};
+		const ParamType param;
+		ThreadData(FuncType func, ParamType& param):func(func),param(param){
+			//std::cout << "ThreadData: const T " << "param: " << param <<std::endl;
+		};
 		static void *function(void *data){
-			std::cout << "function " << "const T param: " << ((ThreadData<FuncType, typename ModernCPP::add_const<ParamType>::type >*)data)->param <<std::endl;
+			//std::cout << "ThreadData: function " << "const T "<<data<<" param: " << ((ThreadData<FuncType, typename ModernCPP::add_const<ParamType>::type >*)data)->param <<std::endl;
 			((ThreadData<FuncType, typename ModernCPP::add_const<ParamType>::type >*)data)->func( ((ThreadData<FuncType, typename ModernCPP::add_const<ParamType>::type >*)data)->param );
 		}
 	};
@@ -34,9 +38,11 @@ namespace ModernCPP {
 	template<typename FuncType>
 	struct ThreadData<FuncType,void,void> : public ThreadDataBase {
 		FuncType func;
-		ThreadData(FuncType func):func(func){std::cout << "FuncType " << std::endl;};
+		ThreadData(FuncType func):func(func){
+			//std::cout << "FuncType " << std::endl;
+		};
 		static void *function(void *data){
-			std::cout << "function " << std::endl;
+			//std::cout << "ThreadData: function " << std::endl;
 			((ThreadData*)data)->func( );
 		}
 	};
@@ -56,17 +62,23 @@ namespace ModernCPP {
 */
 
 			template<typename FuncType,typename ParamType>
-			thread(FuncType functor,ParamType& param):status(false),data( new ThreadData<FuncType,ParamType>(functor,param) ){
-				std::cout << "thread " << threadId  << " T param: " << ((ThreadData<FuncType,ParamType>*)data)->param <<std::endl;
-				pthread_create( &threadId, NULL, &ThreadData<FuncType,ParamType>::function, data);
-				status=true;
+			thread(FuncType functor,ParamType& param):status(false),threadId(0),data( new ThreadData<FuncType,ParamType>(functor,param) ){
+				//std::cout << " T "<<data<<"param: " << ((ThreadData<FuncType,ParamType>*)data)->param <<std::endl;
+				error=pthread_create( &threadId, NULL, &ThreadData<FuncType,ParamType>::function, data);
+				//std::cout << "thread id: " << threadId << std::endl;
+				if(error==0){;
+					status=true;
+				}else{
+					std::cout << "error " << error <<std::endl;
+				}
 			}
 
 			template<typename FuncType,typename ParamType>
-			thread(FuncType functor,const ParamType& param):status(false){
+			thread(FuncType functor,const ParamType& param):status(false),threadId(0){
 				data = new ThreadData<FuncType, typename ModernCPP::add_const<ParamType>::type >(functor,param) ;
-				std::cout << "thread " << threadId << " const T param: " << ((ThreadData<FuncType, typename ModernCPP::add_const<ParamType>::type >*)data)->param <<std::endl;
+				//std::cout << "const T: "<<data<<" param: " << ((ThreadData<FuncType, typename ModernCPP::add_const<ParamType>::type >*)data)->param <<std::endl;
 				error=pthread_create( &threadId, NULL, &ThreadData<FuncType,typename ModernCPP::add_const<ParamType>::type>::function, data);
+				//std::cout << "thread id: " << threadId << std::endl;
 				if(error==0){;
 					status=true;
 				}else{
@@ -75,10 +87,14 @@ namespace ModernCPP {
 			}
 
 			template<typename FuncType>
-			thread(FuncType functor):status(false),data( new ThreadData<FuncType>(functor)){
-				std::cout << "thread " << threadId <<std::endl;
-				pthread_create( &threadId, NULL, &ThreadData<FuncType>::function, data);
-				status=true;
+			thread(FuncType functor):status(false),threadId(0),data( new ThreadData<FuncType>(functor)){
+				error=pthread_create( &threadId, NULL, &ThreadData<FuncType>::function, data);
+				//std::cout << "thread id: " << threadId <<std::endl;
+				if(error==0){;
+					status=true;
+				}else{
+					std::cout << "error " << error <<std::endl;
+				}
 			}
 			thread(const thread& t):status(t.status),data(t.data),threadId(t.threadId){
 				t.status=false;

@@ -40,76 +40,174 @@ int dec(const std::string& x) {
 }
 */
 
+void inc(unsigned long x){
+	for(unsigned long i=0;i<x;i++){
+		counter++;
+	}
+}
+
+void incconref(const int& x){
+	for(unsigned long i=0;i<x;i++){
+		counter++;
+	}
+}
 
 void incref(int& x){
+	lock_guard<mutex> lk(m);
 	x++;
 }
 
-void inccon(const int& x){
-	x;
-}
 
-void inc(unsigned long x){
-	std::cout << "X: " << x <<std::endl;
-	for(unsigned long i=0;i<x;i++){
-		counter++;
-	    std::cout<<counter<<std::endl;
-	}
-}
-
-class Test {
-	unsigned long max;
+class Sample {
+	unsigned long x;
 	public:
-	Test(unsigned long x=10):max(x){}
+	Sample(unsigned long x=10):x(x){}
 	void operator () (){
-		inc(max);
+		for(unsigned long i=0;i<x;i++){
+			counter++;
+		}
 	}
-	void run (){
-		inc(max);
+	void Run (){
+		x+=20;
 	}
+	unsigned long Get() const {return x;}
 };
 
-int main() {
-	{
-		
-		thread t1(inc,10);
-		t1.join();
-		//void (*fp)(unsigned long) = inc;
-		//thread t2(fp,10);
-		thread t2(inc,10);
+void incSampleRef(Sample& obj){
+	lock_guard<mutex> lk(m);
+	obj.Run();
+}
 
-		Test obj1;
-		thread t3(obj1);
- 
-		t3.join();
-		t2.join();
-
-	    std::cout<<counter<<std::endl;
-		
+void incSample(Sample x){
+	for(unsigned long i=0;i<x.Get();i++){
+		counter++;
 	}
-	{
-		/*
-		counter=0;
-		thread t4((Test())); //this is to avoid what's known as C++'s most vexing parse: 
-							// without the parentheses, the declaration is taken to be a declaration of a function called t4 
-	    thread t5=thread(Test());
+}
 
-	    thread t6(Test(10));
+void incSampleRefConst(const Sample& x){
+	for(unsigned long i=0;i<x.Get();i++){
+		counter++;
+	}
+}
+
+int main() {
+	{	// test 1
+	    std::cout<<" test 1"<<std::endl;
+		int x=10;
+		counter=0;
+		thread t1(inc,x);
+		thread t2(inc,x);
+		t1.join();
+		t2.join();
+	    std::cout<<counter<<std::endl;
+	}
+	{//test 2
+	    std::cout<<" test 2"<<std::endl;
+		counter=0;
+		thread t1(inc,10);
+		thread t2(inc,10);
+		t1.join();
+		t2.join();
+	    std::cout<<counter<<std::endl;
+	}
+	{// test 3
+	    std::cout<<" test 3"<<std::endl;
+		int x=10;
+	    std::cout<< x <<std::endl;
+		thread t1(incref,x);
+		thread t2(incref,x);
+		t2.join();
+		t1.join();
+	    std::cout<< x <<std::endl;
+	}
+	{ // test 4
+	    std::cout<<" test 4"<<std::endl;
+		const int x=10;
+	    std::cout<< x <<std::endl;
+		thread t1(incconref,x);
+		thread t2(incconref,x);
+		t2.join();
+		t1.join();
+	    std::cout<< x <<std::endl;
+	}
+	{	//test 5
+	    std::cout<<" test 5"<<std::endl;
+		counter=0;
+		void (*fp)(unsigned long) = inc;
+		thread t(fp,10);
+		t.join();
+	    std::cout<<counter<<std::endl;
+	}
+	{	//test 6
+	    std::cout<<" test 6"<<std::endl;
+		Sample obj;
+		counter=0;
+		thread t1(incSample,obj);
+		thread t2(incSample,obj);
+		t1.join();
+		t2.join();
+	    std::cout<<counter<<std::endl;
+	}
+	{	//test 7
+	    std::cout<<" test 7"<<std::endl;
+		counter=0;
+		thread t1(incSample,Sample());
+		thread t2(incSample,Sample());
+		t1.join();
+		t2.join();
+	    std::cout<<counter<<std::endl;
+	}
+	{	//test 8
+	    std::cout<<" test 8"<<std::endl;
+		Sample obj;
+	    std::cout<<obj.Get()<<std::endl;
+		thread t1(incSampleRef,obj);
+		thread t2(incSampleRef,obj);
+		t1.join();
+		t2.join();
+	    std::cout<<obj.Get()<<std::endl;
+	}
+	{	//test 9
+	    std::cout<<" test 9"<<std::endl;
+		const Sample obj;
+		counter=0;
+		thread t1(incSampleRefConst,obj);
+		thread t2(incSampleRefConst,obj);
+		t1.join();
+		t2.join();
+	    std::cout<<counter<<std::endl;
+	}
+
+	{	//test 10
+	    std::cout<<" test 10"<<std::endl;
+		Sample obj;
+		counter=0;
+		thread t1(obj);
+ 		t1.join();
+	    std::cout<<counter<<std::endl;
+	}
+	{	// test 11
+	    std::cout<<" test 11"<<std::endl;		
+		counter=0;
+		thread t4((Sample())); //this is to avoid what's known as C++'s most vexing parse: 
+							// without the parentheses, the declaration is taken to be a declaration of a function called t4 
+	    thread t5=thread(Sample());
+
+	    thread t6(Sample(10));
 
 		t6.join();
 		t5.join();
 		t4.join();
 	    std::cout<<counter<<std::endl;
-		*/
+		
 	}
 	{
 		/*
-		counter=0;
-		Test obj2;
-	    thread t7(&Test::run,&obj2);
-
-		t7.join();
-	    std::cout<<counter<<std::endl;
+		Sample obj;
+	    std::cout<<obj.Get()<<std::endl;
+	    thread t(&Sample::Run,&obj);
+		t.join();
+	    std::cout<<obj.Get()<<std::endl;
 		*/
 	}
 	{
@@ -129,9 +227,6 @@ int main() {
 		std::cout<<x<<std::endl;
 		*/
 	}
-	{
-		thread t(inccon,10);
-		t.join();
-	}
+
 }
 
