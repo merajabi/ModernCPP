@@ -110,16 +110,19 @@ int main() {
 		t2.join();
 	    std::cout<<counter<<std::endl;
 	}
+
 	{// test 3
 	    std::cout<<" test 3"<<std::endl;
 		int x=10;
 	    std::cout<< x <<std::endl;
-		thread t1(incref,x);
-		thread t2(incref,x);
+		thread t1(incref,ref(x));
+		thread t2(incref,ref(x));
 		t2.join();
 		t1.join();
 	    std::cout<< x <<std::endl;
 	}
+
+
 	{ // test 4
 	    std::cout<<" test 4"<<std::endl;
 		const int x=10;
@@ -130,6 +133,7 @@ int main() {
 		t1.join();
 	    std::cout<< x <<std::endl;
 	}
+
 	{	//test 5
 	    std::cout<<" test 5"<<std::endl;
 		counter=0;
@@ -138,6 +142,8 @@ int main() {
 		t.join();
 	    std::cout<<counter<<std::endl;
 	}
+
+
 	{	//test 6
 	    std::cout<<" test 6"<<std::endl;
 		Sample obj;
@@ -157,16 +163,18 @@ int main() {
 		t2.join();
 	    std::cout<<counter<<std::endl;
 	}
+
 	{	//test 8
 	    std::cout<<" test 8"<<std::endl;
 		Sample obj;
 	    std::cout<<obj.Get()<<std::endl;
-		thread t1(incSampleRef,obj);
-		thread t2(incSampleRef,obj);
+		thread t1(incSampleRef,ref(obj));
+		thread t2(incSampleRef,ref(obj));
 		t1.join();
 		t2.join();
 	    std::cout<<obj.Get()<<std::endl;
 	}
+
 	{	//test 9
 	    std::cout<<" test 9"<<std::endl;
 		const Sample obj;
@@ -186,6 +194,7 @@ int main() {
  		t1.join();
 	    std::cout<<counter<<std::endl;
 	}
+
 	{	// test 11
 	    std::cout<<" test 11"<<std::endl;		
 		counter=0;
@@ -219,14 +228,5 @@ int main() {
 	    std::cout<<counter<<std::endl;
 		*/
 	}
-	{
-		/*
-		int x=10;
-		thread t(incref,std::ref(x));
-		t.join();
-		std::cout<<x<<std::endl;
-		*/
-	}
-
 }
 

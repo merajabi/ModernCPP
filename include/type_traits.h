@@ -45,6 +45,11 @@ namespace ModernCPP {
 		typedef typename ModernCPP::remove_cv<typename ModernCPP::remove_reference<T>::type>::type type;
 	};
 
+	template< class T >
+	T& ref(T& x){
+		return x;
+	};
+
 };
 #endif //_ModernCPP_meta_H_
 
