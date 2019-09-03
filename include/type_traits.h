@@ -92,6 +92,23 @@ namespace ModernCPP {
 		return x;
 	};
 
+	template<typename T,typename U>
+	class _Bind {
+		T func;
+		U param;
+		public:
+		_Bind(T t,U u):func(t),param(u){};
+		void operator ()(){
+			func(param);
+		}
+	};
+
+	template<typename T,typename U>
+	_Bind<T,U> bind(T t,U u){
+		return _Bind<T,U>(t,u);
+	}
+
+	template<typename T> struct autotypeof { typedef T type; };
 
 };
 #endif //_ModernCPP_meta_H_

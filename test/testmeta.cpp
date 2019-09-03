@@ -9,11 +9,14 @@
 	#include "atomic.h"
 	#include "smartguard.h"
 	using namespace ModernCPP;
+	#define AUTO(x,y) autotypeof<__typeof__(y)>::type x = y
 #else
 	#include <thread>
 	#include <mutex>
 	#include <atomic>
+	#include <functional>
 	using namespace std;
+	#define AUTO(x,y) auto x = y
 #endif 
 
 /*
@@ -71,7 +74,7 @@ int main () {
 	return 0;
 }
 */
-
+/*
 template<typename T,typename U>
 void func(T f,U x){
 	f(x);
@@ -121,6 +124,21 @@ int main () {
 	std::cout << obj.Get() << std::endl ;
 	func(run,ref(obj));
 	std::cout << obj.Get() << std::endl ;
+	return 0;
+}
+*/
+
+void inc(int& x){
+	x++;
+}
+
+int main () {
+	int x=10;
+
+	AUTO( f , bind(inc,ref(x)) );
+	f();
+
+	std::cout << x << std::endl ;
 	return 0;
 }
 
