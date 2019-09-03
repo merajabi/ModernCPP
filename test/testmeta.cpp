@@ -127,7 +127,23 @@ int main () {
 	return 0;
 }
 */
+/*
+struct MyClass {
+	int x;
+    int DoStuff(double d){x+=d;}; // actually a DoStuff(MyClass* this, double d)
+};
+int main () {
+	MyClass obj;
+	obj.x=0;
+	//std::function<int(double d)> f = std::bind(&MyClass::DoStuff, &obj, std::placeholders::_1);
+	auto f = std::bind(&MyClass::DoStuff, &obj, std::placeholders::_1) ; // auto f = std::bind(...); in C++11
 
+	f(5);
+	std::cout << obj.x << std::endl ;
+	return 0;
+}
+*/
+/*
 void inc(int& x){
 	x++;
 }
@@ -141,4 +157,151 @@ int main () {
 	std::cout << x << std::endl ;
 	return 0;
 }
+*/
+
+/*
+template<typename F,typename U,typename P>
+void func(F f,U u,P p){
+	(u->*f)(p);
+	return;
+}
+
+class Sample {
+	int x;
+	public:
+	Sample(int x=10):x(x){}
+	void operator () (){
+	}
+	void Add (int t){
+		x+=t;
+	}
+	unsigned long Get() const {return x;}
+};
+
+int main () {
+	Sample obj;
+	int t=5;
+
+	func(&Sample::Add,&obj,t);
+	
+	std::cout << obj.Get() << std::endl ;
+	return 0;
+}
+*/
+
+/*
+template <typename T> struct proxy;
+
+template <typename T, typename R, typename ...Args>
+struct proxy<R (T::*)(Args...)>
+{
+    static R call(T & obj, R (T::*mf)(Args...),Args &&... args)
+    {
+        return (obj.*mf)(std::forward<Args>(args)...);
+    }
+};
+
+
+template <typename T, typename R, typename ...Args>
+R proxycall(T & obj, R (T::*mf)(Args...), Args &&... args)
+{
+    return (obj.*mf)(std::forward<Args>(args)...);
+}
+
+class hello{
+public:
+    void f(){
+        cout<<"f"<<endl;
+    }
+    virtual void ff(){
+        cout<<"ff"<<endl;
+    }
+};
+
+int main () {
+	hello obj;
+
+	proxycall(obj, &hello::ff);
+
+	proxy<void(hello::*)()>::call(obj,&hello::ff);
+
+	// or
+
+	typedef proxy<void(hello::*)()> hello_proxy;
+	hello_proxy::call(obj, &hello::ff);
+
+};
+*/
+
+/*
+template <typename T> struct Delegate;
+template <typename T, typename R, typename ...Args>
+class Delegate<R (T::*)(Args...)> {
+    T obj;
+    R (T::*func)(Args...) ;
+
+public:
+    Delegate(R (T::*mf)(Args...),T obj) : obj(obj), func(mf){
+    }
+
+    R operator()(Args &&... args) {
+        return (obj.*func)(std::forward<Args>(args)...);
+    }
+
+private:
+
+    Delegate();
+    Delegate( const Delegate& );
+};
+
+
+class A {
+public:
+    virtual void Fn( int i ) {
+		std::cout << i << std::endl;
+    }
+};
+
+int main() {
+    A a;
+    Delegate<void(A::*)(int)> cbk(&A::Fn, a);
+    cbk( 3 );
+}
+*/
+
+template <typename T> struct Delegate;
+
+template <typename T, typename R, typename P>
+class Delegate<R (T::*)(P)> {
+    T obj;
+    R (T::*func)(P) ;
+
+public:
+    Delegate(R (T::*mf)(P),T obj) : obj(obj), func(mf){
+    }
+
+    R operator()(P p) {
+        return (obj.*func)(p);
+    }
+
+private:
+
+    Delegate();
+    Delegate( const Delegate& );
+};
+
+class A {
+public:
+    virtual void Fn( int i ) {
+		std::cout << i << std::endl;
+    }
+};
+
+int main() {
+    A a;
+    Delegate<void(A::*)(int)> cbk(&A::Fn, a);
+    cbk( 3 );
+}
+
+
 

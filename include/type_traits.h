@@ -77,6 +77,14 @@ namespace ModernCPP {
 		return std::invoke(get(), std::forward<ArgTypes>(args)...);
 	  }
 	 */
+
+		T* operator ->() {
+			return _ptr;
+		}
+		T* operator ->() const {
+			return _ptr;
+		}
+
 	};
 	// deduction guides
 	//template<class T>
