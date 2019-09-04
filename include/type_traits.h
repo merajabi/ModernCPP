@@ -1,6 +1,15 @@
 #ifndef _ModernCPP_meta_H_
 #define _ModernCPP_meta_H_
 
+#if (__cplusplus < 201103L)
+	#ifndef nullptr
+		#define nullptr NULL
+	#endif
+	#define AUTO(x,y) autotypeof<__typeof__(y)>::type x = y
+#else
+	#define AUTO(x,y) auto x = y
+#endif 
+
 namespace ModernCPP {
 
 	template<bool B, class T = void>

@@ -1,12 +1,10 @@
 #include <iostream>
 
 #if (__cplusplus < 201103L)
-	#ifndef nullptr
-		#define nullptr NULL
-	#endif
 	#include "thread.h"
 	#include "mutex.h"
 	#include "atomic.h"
+	#include "unique_ptr.h"
 	using namespace ModernCPP;
 #else
 	#include <thread>

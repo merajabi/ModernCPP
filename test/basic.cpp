@@ -1,21 +1,16 @@
 #include <iostream>
 
 #if (__cplusplus < 201103L)
-	#ifndef nullptr
-		#define nullptr NULL
-	#endif
 	#include "thread.h"
 	#include "mutex.h"
 	#include "atomic.h"
-	#include "smartguard.h"
+	#include "unique_ptr.h"
 	using namespace ModernCPP;
-	#define AUTO(x,y) autotypeof<__typeof__(y)>::type x = y
 #else
 	#include <thread>
 	#include <mutex>
 	#include <atomic>
 	using namespace std;
-	#define AUTO(x,y) auto x = y
 #endif 
 
 const unsigned long max=10000ul;
@@ -224,9 +219,9 @@ int main() {
 	}
 	{
 		//test 13
-		SmartGuard<Sample> p(new Sample);
+		unique_ptr<Sample> p(new Sample);
 	    std::cout<<p->Get()<<std::endl;
-		thread t(bind(&Sample::Run,p));
+		thread t(bind(&Sample::Run,(Sample*)p));
 		t.join();
 	    std::cout<<p->Get()<<std::endl;		
 	}

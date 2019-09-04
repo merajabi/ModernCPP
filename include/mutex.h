@@ -1,5 +1,6 @@
 #ifndef _ModernCPP_mutex_H_
 #define _ModernCPP_mutex_H_
+#include "type_traits.h"
 
 namespace ModernCPP {
 	class mutex {

@@ -2,7 +2,7 @@
 #define _ModernCPP_thread_H_
 
 #include <pthread.h>
-#include <type_traits.h>
+#include "type_traits.h"
 
 namespace ModernCPP {
 	struct ThreadDataBase {

@@ -1,22 +1,16 @@
 #include <iostream>
 
 #if (__cplusplus < 201103L)
-	#ifndef nullptr
-		#define nullptr NULL
-	#endif
 	#include "thread.h"
 	#include "mutex.h"
 	#include "atomic.h"
-	#include "smartguard.h"
+	#include "unique_ptr.h"
 	using namespace ModernCPP;
-	#define AUTO(x,y) autotypeof<__typeof__(y)>::type x = y
 #else
 	#include <thread>
 	#include <mutex>
 	#include <atomic>
-	#include <functional>
 	using namespace std;
-	#define AUTO(x,y) auto x = y
 #endif 
 
 /*
@@ -424,13 +418,11 @@ int main() {
 
 	}
 	{
-/*
-		SmartGuard<Sample> p(new Sample);
+		unique_ptr<Sample> p(new Sample);
 	    std::cout<<p->Get()<<std::endl;
-		AUTO( f5 , bind(&Sample::Run,p) );
+		AUTO( f5 , bind(&Sample::Run,(Sample*)p) );
 		f5();
 	    std::cout<<p->Get()<<std::endl;		
-*/
 	}
 
 }
@@ -445,25 +437,25 @@ class Sample {
 	}
 	unsigned long Get() const {return x;}
 };
-void dosomething1(SmartGuard<Sample>& x){
+void dosomething1(unique_ptr<Sample>& x){
 	std::cout<<x->Get()<<std::endl;		
 }
-void dosomething2(SmartGuard<Sample> x){
+void dosomething2(unique_ptr<Sample> x){
 	std::cout<<x->Get()<<std::endl;		
 }
-SmartGuard<Sample> dosomething3(SmartGuard<Sample> x){
+unique_ptr<Sample> dosomething3(unique_ptr<Sample> x){
 	std::cout<<x->Get()<<std::endl;		
 	return move(x);
 }
 int main () {
-	SmartGuard<Sample> x(new Sample);
+	unique_ptr<Sample> x(new Sample);
 	Sample *xPtr = move(x);
-	SmartGuard<Sample> y(xPtr);
+	unique_ptr<Sample> y(xPtr);
 	dosomething1(y);
 
-	SmartGuard<Sample> w = dosomething3(move(y));
+	unique_ptr<Sample> w = dosomething3(move(y));
 
-	SmartGuard<Sample> z=move(w);
+	unique_ptr<Sample> z=move(w);
 	dosomething2(move(z));
 }
 */

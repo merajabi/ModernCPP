@@ -1,5 +1,6 @@
 #ifndef _ModernCPP_atomic_H_
 #define _ModernCPP_atomic_H_
+#include "type_traits.h"
 
 namespace ModernCPP {
 	template < typename T >
