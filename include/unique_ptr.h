@@ -52,6 +52,10 @@ namespace ModernCPP {
 				assert(xPtr!=nullptr);
 				return *xPtr;
 			}
+			T& operator *() const {
+				assert(xPtr!=nullptr);
+				return *xPtr;
+			}
 			T* get() const {return xPtr;}
             operator bool() const {return (xPtr==nullptr);}
 

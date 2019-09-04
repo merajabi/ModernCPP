@@ -10,6 +10,7 @@
 	#include <thread>
 	#include <mutex>
 	#include <atomic>
+	#include <functional> //for std::bind
 	using namespace std;
 #endif 
 
@@ -221,7 +222,7 @@ int main() {
 		//test 13
 		unique_ptr<Sample> p(new Sample);
 	    std::cout<<p->Get()<<std::endl;
-		thread t(bind(&Sample::Run,(Sample*)p));
+		thread t(bind(&Sample::Run,p.get()));
 		t.join();
 	    std::cout<<p->Get()<<std::endl;		
 	}

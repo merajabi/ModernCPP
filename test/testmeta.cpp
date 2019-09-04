@@ -1,16 +1,21 @@
 #include <iostream>
 
 #if (__cplusplus < 201103L)
+	#include "type_traits.h"
 	#include "thread.h"
 	#include "mutex.h"
 	#include "atomic.h"
 	#include "unique_ptr.h"
 	using namespace ModernCPP;
+	#define AUTO(x,y) autotypeof<__typeof__(y)>::type x = y
 #else
 	#include <thread>
 	#include <mutex>
 	#include <atomic>
+	//for std::bind
+	#include <functional>
 	using namespace std;
+	#define AUTO(x,y) auto x = y
 #endif 
 
 /*
@@ -357,7 +362,7 @@ class A {
 	int x;
 public:
 	A():x(0){};
-    virtual void Fn( int i ) {
+    virtual void Fn( int i) {
 		x+=i;
     }
 	int Get(){return x;};
@@ -383,15 +388,6 @@ void hello(){
 
 int main() {
 
-	{
-
-		A a;
-		std::cout << a.Get() << std::endl;
-		AUTO( f1 , bind(&A::Fn, &a) );
-		f1(5);
-		std::cout << a.Get() << std::endl;
-
-	}
 	{
 
 		int x=10;
@@ -420,9 +416,23 @@ int main() {
 	{
 		unique_ptr<Sample> p(new Sample);
 	    std::cout<<p->Get()<<std::endl;
-		AUTO( f5 , bind(&Sample::Run,(Sample*)p) );
+		AUTO( f5 , bind(&Sample::Run,&(*p)) );
+		AUTO( f6 , bind(&Sample::Run,p.get()) );
 		f5();
+		f6();
 	    std::cout<<p->Get()<<std::endl;		
+	}
+	{
+
+		A a;
+		std::cout << a.Get() << std::endl;
+#if (__cplusplus < 201103L)
+		AUTO( f1 , bind(&A::Fn, &a) );
+#else
+		AUTO( f1 , bind(&A::Fn, &a,placeholders::_1) );
+#endif
+		f1(5);
+		std::cout << a.Get() << std::endl;
 	}
 
 }
