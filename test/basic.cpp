@@ -9,11 +9,13 @@
 	#include "atomic.h"
 	#include "smartguard.h"
 	using namespace ModernCPP;
+	#define AUTO(x,y) autotypeof<__typeof__(y)>::type x = y
 #else
 	#include <thread>
 	#include <mutex>
 	#include <atomic>
 	using namespace std;
+	#define AUTO(x,y) auto x = y
 #endif 
 
 const unsigned long max=10000ul;
@@ -210,23 +212,23 @@ int main() {
 	    std::cout<<counter<<std::endl;
 		
 	}
-	{
-		/*
+	{	//test 12
+	    std::cout<<" test 12"<<std::endl;		
 		Sample obj;
 	    std::cout<<obj.Get()<<std::endl;
-	    thread t(&Sample::Run,&obj);
+		// AUTO( f1 , bind(&Sample::Run, &obj) );
+	    thread t(bind(&Sample::Run, &obj));
 		t.join();
 	    std::cout<<obj.Get()<<std::endl;
-		*/
+		
 	}
 	{
-		/*
-		counter=0;
-		SmartGuard<Test> p(new Test);
-		thread t(&Test::run,p);
+		//test 13
+		SmartGuard<Sample> p(new Sample);
+	    std::cout<<p->Get()<<std::endl;
+		thread t(bind(&Sample::Run,p));
 		t.join();
-	    std::cout<<counter<<std::endl;
-		*/
+	    std::cout<<p->Get()<<std::endl;		
 	}
 }
 

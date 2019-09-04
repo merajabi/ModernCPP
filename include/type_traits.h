@@ -100,20 +100,81 @@ namespace ModernCPP {
 		return x;
 	};
 
-	template<typename T,typename U>
-	class _Bind {
-		T func;
+	template <typename F,typename U> struct _Bind;
+
+	template <typename R, typename P,typename U>
+	class _Bind<R (&)(P),U> {
+		R (&func)(P) ;
 		U param;
+
+		_Bind();
 		public:
-		_Bind(T t,U u):func(t),param(u){};
-		void operator ()(){
-			func(param);
+		_Bind(R (&f)(P),U u):func(f),param(u){};
+		R operator ()(){
+			return func(param);
+		}
+	};
+	template <typename R>
+	class _Bind<R (&)(void),void> {
+		R (&func)(void) ;
+
+		_Bind();
+		public:
+		_Bind(R (&f)(void)):func(f){};
+		R operator ()(){
+			return func();
 		}
 	};
 
-	template<typename T,typename U>
-	_Bind<T,U> bind(T t,U u){
-		return _Bind<T,U>(t,u);
+
+	template <typename T, typename R, typename P>
+	class _Bind<R (T::*)(P),void> {
+		T* obj;
+		R (T::*func)(P) ;
+
+		_Bind();
+		//Delegate( const Delegate& );
+	public:
+		_Bind(R (T::*mf)(P),T* obj) : obj(obj), func(mf){
+		}
+
+		R operator()(P p) {
+		    return (obj->*func)(p);
+		}
+	};
+	template <typename T, typename R>
+	class _Bind<R (T::*)(void),void> {
+		T* obj;
+		R (T::*func)(void) ;
+
+		_Bind();
+		//Delegate( const Delegate& );
+	public:
+		_Bind(R (T::*mf)(void),T* obj) : obj(obj), func(mf){
+		}
+
+		R operator()(void) {
+		    return (obj->*func)();
+		}
+	};
+
+	template<typename R,typename P,typename U>
+	_Bind<R (&)(P),U> bind(R (&f)(P),U u){
+		return _Bind<R (&)(P),U>(f,u);
+	}
+	template<typename R>
+	_Bind<R (&)(void),void> bind(R (&f)(void)){
+		return _Bind<R (&)(void),void>(f);
+	}
+
+	template <typename T, typename R, typename P>
+	_Bind<R (T::*)(P),void> bind(R (T::*mf)(P),T* obj) {
+		//return (obj.*mf)(std::forward<Args>(args)...);
+		return _Bind<R (T::*)(P),void>(mf, obj);
+	}
+	template <typename T, typename R>
+	_Bind<R (T::*)(void),void> bind(R (T::*mf)(void),T* obj) {
+		return _Bind<R (T::*)(void),void>(mf, obj);
 	}
 
 	template<typename T> struct autotypeof { typedef T type; };

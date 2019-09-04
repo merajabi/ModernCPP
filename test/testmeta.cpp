@@ -268,20 +268,20 @@ int main() {
     cbk( 3 );
 }
 */
-
+/*
 template <typename T> struct Delegate;
 
 template <typename T, typename R, typename P>
 class Delegate<R (T::*)(P)> {
-    T obj;
+    T* obj;
     R (T::*func)(P) ;
 
 public:
-    Delegate(R (T::*mf)(P),T obj) : obj(obj), func(mf){
+    Delegate(R (T::*mf)(P),T* obj) : obj(obj), func(mf){
     }
 
     R operator()(P p) {
-        return (obj.*func)(p);
+        return (obj->*func)(p);
     }
 
 private:
@@ -291,17 +291,179 @@ private:
 };
 
 class A {
+	int x;
 public:
+	A():x(0){};
     virtual void Fn( int i ) {
-		std::cout << i << std::endl;
+		x+=i;
+		std::cout << x << std::endl;
     }
+	int Get(){return x;};
 };
 
 int main() {
     A a;
-    Delegate<void(A::*)(int)> cbk(&A::Fn, a);
+    Delegate<void(A::*)(int)> cbk(&A::Fn, &a);
     cbk( 3 );
+	std::cout << a.Get() << std::endl;
+}
+*/
+/*
+template <typename T> struct Delegate;
+
+template <typename T, typename R, typename P>
+class Delegate<R (T::*)(P)> {
+    T* obj;
+    R (T::*func)(P) ;
+
+public:
+    Delegate(R (T::*mf)(P),T* obj) : obj(obj), func(mf){
+    }
+
+    R operator()(P p) {
+        return (obj->*func)(p);
+    }
+
+private:
+
+    Delegate();
+    //Delegate( const Delegate& );
+};
+
+template <typename T, typename R, typename P>
+Delegate<R (T::*)(P)> proxycall(R (T::*mf)(P),T* obj) {
+    //return (obj.*mf)(std::forward<Args>(args)...);
+    return Delegate<R (T::*)(P)>(mf, obj);
 }
 
+class A {
+	int x;
+public:
+	A():x(0){};
+    virtual void Fn( int i ) {
+		x+=i;
+		std::cout << x << std::endl;
+    }
+	int Get(){return x;};
+};
 
+int main() {
+    A a;
+    Delegate<void(A::*)(int)> cbk(&A::Fn, &a);
+    cbk( 3 );
+	std::cout << a.Get() << std::endl;
 
+	AUTO( f , proxycall(&A::Fn, &a) );
+	f(5);
+	std::cout << a.Get() << std::endl;
+}
+*/
+
+class A {
+	int x;
+public:
+	A():x(0){};
+    virtual void Fn( int i ) {
+		x+=i;
+    }
+	int Get(){return x;};
+};
+
+class Sample {
+	unsigned long x;
+	public:
+	Sample(unsigned long x=10):x(x){}
+	void Run (void){
+		x+=20;
+	}
+	unsigned long Get() const {return x;}
+};
+
+void inc(int& x){
+	x++;
+}
+
+void hello(){
+	std::cout << "hello" << std::endl;
+}
+
+int main() {
+
+	{
+
+		A a;
+		std::cout << a.Get() << std::endl;
+		AUTO( f1 , bind(&A::Fn, &a) );
+		f1(5);
+		std::cout << a.Get() << std::endl;
+
+	}
+	{
+
+		int x=10;
+		//void (&fp)(int&) = inc;
+		AUTO( f2 , bind(inc,ref(x)) );
+		f2();
+		std::cout << x << std::endl ;
+
+	}
+	{
+
+		Sample obj;
+		std::cout << obj.Get() << std::endl;
+		AUTO( f3 , bind(&Sample::Run, &obj) );
+		f3();
+		std::cout << obj.Get() << std::endl;
+
+	}
+	{
+
+		//void (&fp)(int&) = inc;
+		AUTO( f4 , bind(hello) );
+		f4();
+
+	}
+	{
+/*
+		SmartGuard<Sample> p(new Sample);
+	    std::cout<<p->Get()<<std::endl;
+		AUTO( f5 , bind(&Sample::Run,p) );
+		f5();
+	    std::cout<<p->Get()<<std::endl;		
+*/
+	}
+
+}
+
+/*
+class Sample {
+	unsigned long x;
+	public:
+	Sample(unsigned long x=10):x(x){}
+	void Run (void){
+		x+=20;
+	}
+	unsigned long Get() const {return x;}
+};
+void dosomething1(SmartGuard<Sample>& x){
+	std::cout<<x->Get()<<std::endl;		
+}
+void dosomething2(SmartGuard<Sample> x){
+	std::cout<<x->Get()<<std::endl;		
+}
+SmartGuard<Sample> dosomething3(SmartGuard<Sample> x){
+	std::cout<<x->Get()<<std::endl;		
+	return move(x);
+}
+int main () {
+	SmartGuard<Sample> x(new Sample);
+	Sample *xPtr = move(x);
+	SmartGuard<Sample> y(xPtr);
+	dosomething1(y);
+
+	SmartGuard<Sample> w = dosomething3(move(y));
+
+	SmartGuard<Sample> z=move(w);
+	dosomething2(move(z));
+}
+*/

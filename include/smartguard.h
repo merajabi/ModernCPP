@@ -11,21 +11,22 @@
 namespace ModernCPP {
 	template<typename T>
 	class SmartGuard {
-		T *xPtr;
-			SmartGuard(const SmartGuard &pg);
+		mutable T *xPtr;
+			SmartGuard(SmartGuard &pg);
+			//SmartGuard(const SmartGuard &pg);
+			SmartGuard& operator= (SmartGuard &pg);
 			SmartGuard& operator= (const SmartGuard &pg);
 		public:
 			SmartGuard(T *xp=nullptr){
 				xPtr=xp;
 			}
-			SmartGuard(SmartGuard &pg){
+			SmartGuard(const SmartGuard &pg){
 				xPtr=pg.xPtr;
 				pg.xPtr=nullptr;
 			}
-			SmartGuard& operator= (SmartGuard &pg){
+			SmartGuard& operator= (T *xp){
 				assert(xPtr==nullptr);
-				xPtr=pg.xPtr;
-				pg.xPtr=nullptr;
+				xPtr=xp;
 				return *this;
 			}
 			~SmartGuard() {
@@ -52,6 +53,22 @@ namespace ModernCPP {
 				assert(xPtr!=nullptr);
 				return xPtr;
 			}
+			T* move(){
+				T* tmp=xPtr;
+				xPtr=nullptr;
+				return tmp;
+			}
+			T* release(){
+				T* tmp=xPtr;
+				xPtr=nullptr;
+				return tmp;
+			}
+			void reset(){
+				if(xPtr!=nullptr){
+					delete xPtr;
+				}
+				xPtr=nullptr;
+			}
 	};
 
 
@@ -62,6 +79,10 @@ namespace ModernCPP {
 		typedef Matrix<N, 1> type;
 	};
 */
+	template<typename T>
+	T* move (SmartGuard<T>& p){
+		return p.move();
+	}
 };
 #endif //_ModernCPP_SmartGuard_H_
 
