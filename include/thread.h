@@ -16,6 +16,7 @@ namespace ModernCPP {
 		ThreadData(FuncType func,ParamType param):func(func),param(param){};
 		static void *function(void *data){
 			((ThreadData*)data)->func( ((ThreadData*)data)->param );
+			return 0;
 		}
 	};
 
@@ -25,6 +26,7 @@ namespace ModernCPP {
 		ThreadData(FuncType func):func(func){};
 		static void *function(void *data){
 			((ThreadData*)data)->func( );
+			return 0;
 		}
 	};
 
@@ -44,7 +46,7 @@ namespace ModernCPP {
 				pthread_create( &threadId, NULL, &ThreadData<FuncType>::function, data);
 				status=true;
 			}
-			thread(const thread& t):status(t.status),data(t.data),threadId(t.threadId){
+			thread(const thread& t):status(t.status),threadId(t.threadId),data(t.data){
 				t.status=false;
 				t.threadId=-1;
 				t.data=nullptr;
