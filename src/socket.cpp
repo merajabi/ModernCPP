@@ -176,7 +176,7 @@ bool Socket::RecvUC(std::string& buffer, int recvbuflen) {
 		}
 	//} while( inBytes > 0 && recvbuflen > 0 );
 
-	PrintDebugInfo();
+	PrintIncomingInfo(sadr,sadrLen); //PrintDebugInfo();
 	return result;
 }
 
@@ -301,94 +301,11 @@ int Socket::openSckt( const char *service,
          ( ai != NULL ) && ( *descSize < maxDescs );
          ai = ai->ai_next )
    {
-      if ( verbose )
-      {
-         /*
-         ** Display the current address info.   Start with the protocol-
-         ** independent fields first.
-         */
-         fprintf( stderr,
-                  "Setting up a passive socket based on the "
-                  "following address info:\n"
-                  "   ai_flags     = 0x%02X\n"
-                  "   ai_family    = %d (PF_INET = %d, PF_INET6 = %d)\n"
-                  "   ai_socktype  = %d (SOCK_STREAM = %d, SOCK_DGRAM = %d)\n"
-                  "   ai_protocol  = %d (IPPROTO_TCP = %d, IPPROTO_UDP = %d)\n"
-                  "   ai_addrlen   = %d (sockaddr_in = %lu, "
-                  "sockaddr_in6 = %lu)\n",
-                  ai->ai_flags,
-                  ai->ai_family,
-                  PF_INET,
-                  PF_INET6,
-                  ai->ai_socktype,
-                  SOCK_STREAM,
-                  SOCK_DGRAM,
-                  ai->ai_protocol,
-                  IPPROTO_TCP,
-                  IPPROTO_UDP,
-                  ai->ai_addrlen,
-                  sizeof( struct sockaddr_in ),
-                  sizeof( struct sockaddr_in6 ) );
-         /*
-         ** Now display the protocol-specific formatted socket address.  Note
-         ** that the program is requesting that getnameinfo(3) convert the
-         ** host & service into numeric strings.
-         */
-         getnameinfo( ai->ai_addr,
-                      ai->ai_addrlen,
-                      hostBfr,
-                      sizeof( hostBfr ),
-                      servBfr,
-                      sizeof( servBfr ),
-                      NI_NUMERICHOST | NI_NUMERICSERV );
-         switch ( ai->ai_family )
-         {
-            case PF_INET:   /* IPv4 address record. */
-            {
-               struct sockaddr_in *p = (struct sockaddr_in*) ai->ai_addr;
-               fprintf( stderr,
-                        "   ai_addr      = sin_family:   %d (AF_INET = %d, "
-                        "AF_INET6 = %d)\n"
-                        "                  sin_addr:     %s\n"
-                        "                  sin_port:     %s\n",
-                        p->sin_family,
-                        AF_INET,
-                        AF_INET6,
-                        hostBfr,
-                        servBfr );
-               break;
-            }  /* End CASE of IPv4. */
-            case PF_INET6:   /* IPv6 address record. */
-            {
-               struct sockaddr_in6 *p = (struct sockaddr_in6*) ai->ai_addr;
-               fprintf( stderr,
-                        "   ai_addr      = sin6_family:   %d (AF_INET = %d, "
-                        "AF_INET6 = %d)\n"
-                        "                  sin6_addr:     %s\n"
-                        "                  sin6_port:     %s\n"
-                        "                  sin6_flowinfo: %d\n"
-                        "                  sin6_scope_id: %d\n",
-                        p->sin6_family,
-                        AF_INET,
-                        AF_INET6,
-                        hostBfr,
-                        servBfr,
-                        p->sin6_flowinfo,
-                        p->sin6_scope_id );
-               break;
-            }  /* End CASE of IPv6. */
-            default:   /* Can never get here, but just for completeness. */
-            {
-               fprintf( stderr,
-                        "%s (line %d): ERROR - Unknown protocol family (%d).\n",
-                        pgmName,
-                        __LINE__,
-                        ai->ai_family );
-               freeaddrinfo( aiHead );
-               return false;
-            }  /* End DEFAULT case (unknown protocol family). */
-         }  /* End SWITCH on protocol family. */
-      }  /* End IF verbose mode. */
+		if(!PrintAddrInfo(ai)){
+			freeaddrinfo( aiHead );
+			return false;
+		}
+
       /*
       ** Create a socket using the info in the addrinfo structure.
       */
@@ -632,79 +549,8 @@ int Socket::tod( int    tSckt[ ],
             SYSCALL("shutdown", __LINE__,  shutdown( newSckt,       // Server never recv's anything.
                            SHUT_RD ) );
 */ // ********************  NOT REQUIRED ********************
-            if ( verbose )
-            {
-               /*
-               ** Display the socket address of the remote client.  Begin with
-               ** the address-independent fields.
-               */
-               fprintf( stderr,
-                        "Sockaddr info for new TCP client:\n"
-                        "   sa_family = %d (AF_INET = %d, AF_INET6 = %d)\n"
-                        "   addr len  = %d (sockaddr_in = %lu, "
-                        "sockaddr_in6 = %lu)\n",
-                        sadr->sa_family,
-                        AF_INET,
-                        AF_INET6,
-                        sadrLen,
-                        sizeof( struct sockaddr_in ),
-                        sizeof( struct sockaddr_in6 ) );
-               /*
-               ** Display the address-specific fields.
-               */
-               getnameinfo( sadr,
-                            sadrLen,
-                            hostBfr,
-                            sizeof( hostBfr ),
-                            servBfr,
-                            sizeof( servBfr ),
-                            NI_NUMERICHOST | NI_NUMERICSERV );
-               /*
-               ** Notice that we're switching on an address family now, not a
-               ** protocol family.
-               */
-               switch ( sadr->sa_family )
-               {
-                  case AF_INET:   /* IPv4 address. */
-                  {
-                     struct sockaddr_in *p = (struct sockaddr_in*) sadr;
-                     fprintf( stderr,
-                              "   sin_addr  = sin_family: %d\n"
-                              "               sin_addr:   %s\n"
-                              "               sin_port:   %s\n",
-                              p->sin_family,
-                              hostBfr,
-                              servBfr );
-                     break;
-                  }  /* End CASE of IPv4. */
-                  case AF_INET6:   /* IPv6 address. */
-                  {
-                     struct sockaddr_in6 *p = (struct sockaddr_in6*) sadr;
-                     fprintf( stderr,
-                              "   sin6_addr = sin6_family:   %d\n"
-                              "               sin6_addr:     %s\n"
-                              "               sin6_port:     %s\n"
-                              "               sin6_flowinfo: %d\n"
-                              "               sin6_scope_id: %d\n",
-                              p->sin6_family,
-                              hostBfr,
-                              servBfr,
-                              p->sin6_flowinfo,
-                              p->sin6_scope_id );
-                     break;
-                  }  /* End CASE of IPv6. */
-                  default:   /* Can never get here, but for completeness. */
-                  {
-                     fprintf( stderr,
-                              "%s (line %d): ERROR - Unknown address "
-                              "family (%d).\n",
-                              pgmName,
-                              __LINE__,
-                              sadr->sa_family );
-                     break;
-                  }  /* End DEFAULT case (unknown address family). */
-               }  /* End SWITCH on address family. */
-            }  /* End IF verbose mode. */
+
+			PrintIncomingInfo(sadr,sadrLen);
 
             /*
             ** Send the TOD to the client.
@@ -866,98 +712,9 @@ int Socket::openScktTC( const char   *host,
             pSadrIn6->sin6_scope_id = scopeId;
          }  /* End IF the scope ID wasn't set. */
       }  /* End IPv6 kluge. */
-      /*
-      ** Display the address info for the remote host.
-      */
-      if ( verbose )
-      {
-         /*
-         ** Temporary character string buffers for host & service.
-         */
-         char hostBfr[ NI_MAXHOST ];
-         char servBfr[ NI_MAXSERV ];
-         /*
-         ** Display the address information just fetched.  Start with the
-         ** common (protocol-independent) stuff first.
-         */
-         fprintf( stderr,
-                  "Address info:\n"
-                  "   ai_flags     = 0x%02X\n"
-                  "   ai_family    = %d (PF_INET = %d, PF_INET6 = %d)\n"
-                  "   ai_socktype  = %d (SOCK_STREAM = %d, SOCK_DGRAM = %d)\n"
-                  "   ai_protocol  = %d (IPPROTO_TCP = %d, IPPROTO_UDP = %d)\n"
-                  "   ai_addrlen   = %d (sockaddr_in = %lu, "
-                  "sockaddr_in6 = %lu)\n",
-                  ai->ai_flags,
-                  ai->ai_family,
-                  PF_INET,
-                  PF_INET6,
-                  ai->ai_socktype,
-                  SOCK_STREAM,
-                  SOCK_DGRAM,
-                  ai->ai_protocol,
-                  IPPROTO_TCP,
-                  IPPROTO_UDP,
-                  ai->ai_addrlen,
-                  sizeof( struct sockaddr_in ),
-                  sizeof( struct sockaddr_in6 ) );
-         /*
-         ** Display the protocol-specific formatted address.
-         */
-         getnameinfo( ai->ai_addr,
-                      ai->ai_addrlen,
-                      hostBfr,
-                      sizeof( hostBfr ),
-                      servBfr,
-                      sizeof( servBfr ),
-                      NI_NUMERICHOST | NI_NUMERICSERV );
-         switch ( ai->ai_family )
-         {
-            case PF_INET:   /* IPv4 address record. */
-            {
-               sockaddr_in_t *pSadrIn = (sockaddr_in_t*) ai->ai_addr;
-               fprintf( stderr,
-                        "   ai_addr      = sin_family: %d (AF_INET = %d, "
-                        "AF_INET6 = %d)\n"
-                        "                  sin_addr:   %s\n"
-                        "                  sin_port:   %s\n",
-                        pSadrIn->sin_family,
-                        AF_INET,
-                        AF_INET6,
-                        hostBfr,
-                        servBfr );
-               break;
-            }  /* End CASE of IPv4 record. */
-            case PF_INET6:   /* IPv6 address record. */
-            {
-               pSadrIn6 = (sockaddr_in6_t*) ai->ai_addr;
-               fprintf( stderr,
-                        "   ai_addr      = sin6_family:   %d (AF_INET = %d, "
-                        "AF_INET6 = %d)\n"
-                        "                  sin6_addr:     %s\n"
-                        "                  sin6_port:     %s\n"
-                        "                  sin6_flowinfo: %d\n"
-                        "                  sin6_scope_id: %d\n",
-                        pSadrIn6->sin6_family,
-                        AF_INET,
-                        AF_INET6,
-                        hostBfr,
-                        servBfr,
-                        pSadrIn6->sin6_flowinfo,
-                        pSadrIn6->sin6_scope_id );
-               break;
-            }  /* End CASE of IPv6 record. */
-            default:   /* Can never get here, but just for completeness. */
-            {
-               fprintf( stderr,
-                        "%s (line %d): ERROR - Unknown protocol family (%d).\n",
-                        pgmName,
-                        __LINE__,
-                        ai->ai_family );
-               break;
-            }  /* End DEFAULT case (unknown protocol family). */
-         }  /* End SWITCH on protocol family. */
-      }  /* End IF verbose mode. */
+
+		PrintAddrInfo(ai); //PrintRemoteInfo(ai);
+
       /*
       ** Create a socket.
       */
@@ -1078,98 +835,9 @@ int Socket::openScktUC( const char   *host,
             pSadrIn6->sin6_scope_id = scopeId;
          }  /* End IF the scope ID wasn't set. */
       }  /* End IPv6 kluge. */
-      /*
-      ** Display the address info for the remote host.
-      */
-      if ( verbose )
-      {
-         /*
-         ** Temporary character string buffers for host & service.
-         */
-         char hostBfr[ NI_MAXHOST ];
-         char servBfr[ NI_MAXSERV ];
-         /*
-         ** Display the address information just fetched.  Start with the
-         ** common (protocol-independent) stuff first.
-         */
-         fprintf( stderr,
-                  "Address info:\n"
-                  "   ai_flags     = 0x%02X\n"
-                  "   ai_family    = %d (PF_INET = %d, PF_INET6 = %d)\n"
-                  "   ai_socktype  = %d (SOCK_STREAM = %d, SOCK_DGRAM = %d)\n"
-                  "   ai_protocol  = %d (IPPROTO_TCP = %d, IPPROTO_UDP = %d)\n"
-                  "   ai_addrlen   = %d (sockaddr_in = %lu, "
-                  "sockaddr_in6 = %lu)\n",
-                  ai->ai_flags,
-                  ai->ai_family,
-                  PF_INET,
-                  PF_INET6,
-                  ai->ai_socktype,
-                  SOCK_STREAM,
-                  SOCK_DGRAM,
-                  ai->ai_protocol,
-                  IPPROTO_TCP,
-                  IPPROTO_UDP,
-                  ai->ai_addrlen,
-                  sizeof( struct sockaddr_in ),
-                  sizeof( struct sockaddr_in6 ) );
-         /*
-         ** Display the protocol-specific formatted address.
-         */
-         getnameinfo( ai->ai_addr,
-                      ai->ai_addrlen,
-                      hostBfr,
-                      sizeof( hostBfr ),
-                      servBfr,
-                      sizeof( servBfr ),
-                      NI_NUMERICHOST | NI_NUMERICSERV );
-         switch ( ai->ai_family )
-         {
-            case PF_INET:   /* IPv4 address record. */
-            {
-               sockaddr_in_t *pSadrIn = (sockaddr_in_t*) ai->ai_addr;
-               fprintf( stderr,
-                        "   ai_addr      = sin_family: %d (AF_INET = %d, "
-                        "AF_INET6 = %d)\n"
-                        "                  sin_addr:   %s\n"
-                        "                  sin_port:   %s\n",
-                        pSadrIn->sin_family,
-                        AF_INET,
-                        AF_INET6,
-                        hostBfr,
-                        servBfr );
-               break;
-            }  /* End CASE of IPv4 record. */
-            case PF_INET6:   /* IPv6 address record. */
-            {
-               pSadrIn6 = (sockaddr_in6_t*) ai->ai_addr;
-               fprintf( stderr,
-                        "   ai_addr      = sin6_family:   %d (AF_INET = %d, "
-                        "AF_INET6 = %d)\n"
-                        "                  sin6_addr:     %s\n"
-                        "                  sin6_port:     %s\n"
-                        "                  sin6_flowinfo: %d\n"
-                        "                  sin6_scope_id: %d\n",
-                        pSadrIn6->sin6_family,
-                        AF_INET,
-                        AF_INET6,
-                        hostBfr,
-                        servBfr,
-                        pSadrIn6->sin6_flowinfo,
-                        pSadrIn6->sin6_scope_id );
-               break;
-            }  /* End CASE of IPv6 record. */
-            default:   /* Can never get here, but just for completeness. */
-            {
-               fprintf( stderr,
-                        "%s (line %d): ERROR - Unknown protocol family (%d).\n",
-                        pgmName,
-                        __LINE__,
-                        ai->ai_family );
-               break;
-            }  /* End DEFAULT case (unknown protocol family). */
-         }  /* End SWITCH on protocol family. */
-      }  /* End IF verbose mode. */
+
+		PrintAddrInfo(ai); //PrintRemoteInfo(ai);
+
       /*
       ** Create a socket.
       */
@@ -1204,104 +872,205 @@ int Socket::openScktUC( const char   *host,
    return sckt;
 }  /* End openSckt() */
 
+      /*
+      ** Display the address info.
+      */
+bool Socket::PrintAddrInfo( struct addrinfo *sadr ){
 
-bool Socket::PrintDebugInfo(){
+//	struct sockaddr         *sadr;
+//	socklen_t                sadrLen;
+//	sadrLen = sizeof( sockStor );
+//	sadr    = (struct sockaddr*) ai;
 
-   struct sockaddr         *sadr;
-   socklen_t                sadrLen;
+    if ( verbose )
+    {
 
-            sadrLen = sizeof( sockStor );
-            sadr    = (struct sockaddr*) &sockStor;
+		/*
+		** Display the current address info.   Start with the protocol-
+		** independent fields first.
+		*/
 
-            /*
-            ** Display whatever was received on stdout.
-            */
-            if ( verbose )
-            {
+		char hostBfr[ NI_MAXHOST ];
+		char servBfr[ NI_MAXSERV ];
 
-/*	********************  NOT REQUIRED ********************
-               ssize_t rBytes = count;
-               fprintf( stderr,
-                        "%s: UDP datagram received (%d bytes).\n",
-                        pgmName,
-                        count );
-               while ( count > 0 )
-               {
-                  fputc( bfr[ rBytes - count-- ],
-                         stdout );
-               }
-               if ( bfr[ rBytes-1 ] != '\n' ) {
-                  fputc( '\n', stdout );   // Newline also flushes stdout.
-				}
-*/ // ********************  NOT REQUIRED ********************
+		/*
+		** Display the socket address of the remote client.  Address-
+		** independent fields first.
+		*/
 
-               /*
-               ** Display the socket address of the remote client.  Address-
-               ** independent fields first.
-               */
-               fprintf( stderr,
-                        "Remote client's sockaddr info:\n"
-                        "   sa_family = %d (AF_INET = %d, AF_INET6 = %d)\n"
-                        "   addr len  = %d (sockaddr_in = %lu, "
-                        "sockaddr_in6 = %lu)\n",
-                        sadr->sa_family,
-                        AF_INET,
-                        AF_INET6,
-                        sadrLen,
-                        sizeof( struct sockaddr_in ),
-                        sizeof( struct sockaddr_in6 ) );
-               /*
-               ** Display the address-specific information.
-               */
-               getnameinfo( sadr,
-                            sadrLen,
-                            hostBfr,
-                            sizeof( hostBfr ),
-                            servBfr,
-                            sizeof( servBfr ),
-                            NI_NUMERICHOST | NI_NUMERICSERV );
-               switch ( sadr->sa_family )
-               {
-                  case AF_INET:   /* IPv4 address. */
-                  {
-                     struct sockaddr_in *p = (struct sockaddr_in*) sadr;
-                     fprintf( stderr,
-                              "   sin_addr  = sin_family: %d\n"
-                              "               sin_addr:   %s\n"
-                              "               sin_port:   %s\n",
-                              p->sin_family,
-                              hostBfr,
-                              servBfr );
-                     break;
-                  }  /* End CASE of IPv4 address. */
-                  case AF_INET6:   /* IPv6 address. */
-                  {
-                     struct sockaddr_in6 *p = (struct sockaddr_in6*) sadr;
-                     fprintf( stderr,
-                              "   sin6_addr = sin6_family:   %d\n"
-                              "               sin6_addr:     %s\n"
-                              "               sin6_port:     %s\n"
-                              "               sin6_flowinfo: %d\n"
-                              "               sin6_scope_id: %d\n",
-                              p->sin6_family,
-                              hostBfr,
-                              servBfr,
-                              p->sin6_flowinfo,
-                              p->sin6_scope_id );
-                     break;
-                  }  /* End CASE of IPv6 address. */
-                  default:   /* Can never get here, but for completeness. */
-                  {
-                     fprintf( stderr,
-                              "%s (line %d): ERROR - Unknown address "
-                              "family (%d).\n",
-                              pgmName,
-                              __LINE__,
-                              sadr->sa_family );
-                     break;
-                  }  /* End DEFAULT case (unknown address family). */
-               }  /* End SWITCH on address family. */
-            }  /* End IF verbose mode. */
+		fprintf( stderr,
+			"Address info (PrintAddrInfo):\n"
+			"   ai_flags     = 0x%02X\n"
+			"   ai_family    = %d (PF_INET = %d, PF_INET6 = %d)\n"
+			"   ai_socktype  = %d (SOCK_STREAM = %d, SOCK_DGRAM = %d)\n"
+			"   ai_protocol  = %d (IPPROTO_TCP = %d, IPPROTO_UDP = %d)\n"
+			"   ai_addrlen   = %d (sockaddr_in = %lu, sockaddr_in6 = %lu)\n",
+			sadr->ai_flags,
+			sadr->ai_family,
+			PF_INET,
+			PF_INET6,
+			sadr->ai_socktype,
+			SOCK_STREAM,
+			SOCK_DGRAM,
+			sadr->ai_protocol,
+			IPPROTO_TCP,
+			IPPROTO_UDP,
+			sadr->ai_addrlen,
+			sizeof( struct sockaddr_in ),
+			sizeof( struct sockaddr_in6 ) );
+
+		/*
+		** Now display the protocol-specific formatted socket address.  Note
+		** that the program is requesting that getnameinfo(3) convert the
+		** host & service into numeric strings.
+		*/
+		getnameinfo( sadr->ai_addr,
+			sadr->ai_addrlen,
+			hostBfr,
+			sizeof( hostBfr ),
+			servBfr,
+			sizeof( servBfr ),
+			NI_NUMERICHOST | NI_NUMERICSERV );
+
+		/*
+		** Notice that we're switching on an address family now, not a
+		** protocol family.
+		*/
+
+		switch ( sadr->ai_family )
+		{
+			case PF_INET:   /* IPv4 address. */
+			{
+				struct sockaddr_in *pSadrIn = (struct sockaddr_in*) sadr->ai_addr;
+				fprintf( stderr,
+					"   sin_addr  = sin_family: %d\n"
+					"               sin_addr:   %s\n"
+					"               sin_port:   %s\n",
+					pSadrIn->sin_family,
+					hostBfr,
+					servBfr );
+				break;
+			}  /* End CASE of IPv4 address. */
+			case PF_INET6:   /* IPv6 address. */
+			{
+				struct sockaddr_in6 *pSadrIn6 = (struct sockaddr_in6*) sadr->ai_addr;
+				fprintf( stderr,
+					"   sin6_addr = sin6_family:   %d\n"
+					"               sin6_addr:     %s\n"
+					"               sin6_port:     %s\n"
+					"               sin6_flowinfo: %d\n"
+					"               sin6_scope_id: %d\n",
+					pSadrIn6->sin6_family,
+					hostBfr,
+					servBfr,
+					pSadrIn6->sin6_flowinfo,
+					pSadrIn6->sin6_scope_id );
+				break;
+			}  /* End CASE of IPv6 address. */
+			default:   /* Can never get here, but just for completeness. */
+			{
+				fprintf( stderr,
+					"%s (line %d): ERROR - Unknown protocol family (%d).\n",
+					pgmName,
+					__LINE__,
+					sadr->ai_family );
+				//freeaddrinfo( aiHead );
+				return false;
+			}  /* End DEFAULT case (unknown protocol family). */
+		}  /* End SWITCH on protocol family. */
+	}  /* End IF verbose mode. */
+	return true;
+}
+
+      /*
+      ** Display the address info.
+      */
+bool Socket::PrintIncomingInfo( struct sockaddr *sadr , socklen_t sadrLen ){
+	if ( verbose )
+	{
+
+		/*
+		** Temporary character string buffers for host & service.
+		*/
+
+		char hostBfr[ NI_MAXHOST ];
+		char servBfr[ NI_MAXSERV ];
+
+		/*
+		** Display the socket address info of the remote client.   Start with the protocol-
+		** independent fields first.
+		*/
+
+		fprintf( stderr,
+			"Sockaddr info(PrintIncomingInfo):\n"
+			"   sa_family = %d (AF_INET = %d, AF_INET6 = %d)\n"
+			"   addrlen  = %d (sockaddr_in = %lu, sockaddr_in6 = %lu)\n",
+			sadr->sa_family,
+			AF_INET,
+			AF_INET6,
+			sadrLen,
+			sizeof( struct sockaddr_in ),
+			sizeof( struct sockaddr_in6 ) );
+
+		/*
+		** Now display the protocol-specific formatted socket address.  Note
+		** that the program is requesting that getnameinfo(3) convert the
+		** host & service into numeric strings.
+		*/
+		getnameinfo( sadr,
+			sadrLen,
+			hostBfr,
+			sizeof( hostBfr ),
+			servBfr,
+			sizeof( servBfr ),
+			NI_NUMERICHOST | NI_NUMERICSERV );
+
+		/*
+		** Notice that we're switching on an address family now, not a
+		** protocol family.
+		*/
+
+		switch ( sadr->sa_family )
+		{
+			case AF_INET:   /* IPv4 address. */
+			{
+				struct sockaddr_in *pSadrIn = (struct sockaddr_in*) sadr;
+				fprintf( stderr,
+					"   sin_addr  = sin_family: %d\n"
+					"               sin_addr:   %s\n"
+					"               sin_port:   %s\n",
+					pSadrIn->sin_family,
+					hostBfr,
+					servBfr );
+				break;
+			}  /* End CASE of IPv4 address. */
+			case AF_INET6:   /* IPv6 address. */
+			{
+				struct sockaddr_in6 *pSadrIn6 = (struct sockaddr_in6*) sadr;
+				fprintf( stderr,
+					"   sin6_addr = sin6_family:   %d\n"
+					"               sin6_addr:     %s\n"
+					"               sin6_port:     %s\n"
+					"               sin6_flowinfo: %d\n"
+					"               sin6_scope_id: %d\n",
+					pSadrIn6->sin6_family,
+					hostBfr,
+					servBfr,
+					pSadrIn6->sin6_flowinfo,
+					pSadrIn6->sin6_scope_id );
+				break;
+			}  /* End CASE of IPv6 address. */
+			default:   /* Can never get here, but just for completeness. */
+			{
+				fprintf( stderr,
+					"%s (line %d): ERROR - Unknown address family (%d).\n",
+					pgmName,
+					__LINE__,
+					sadr->sa_family );
+				return false;
+			}  /* End DEFAULT case (unknown address family). */
+		}  /* End SWITCH on address family. */
+	}  /* End IF verbose mode. */
 	return true;
 }
 

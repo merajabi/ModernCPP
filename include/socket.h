@@ -168,7 +168,10 @@ class Socket {
 		bool RecvTC(std::string& buffer, int recvbuflen);
 
 		bool SetTimeout(unsigned long tout);
-		bool PrintDebugInfo();
+		//bool PrintDebugInfo();
+		bool PrintAddrInfo( struct addrinfo *ai );
+		bool PrintIncomingInfo( struct sockaddr *sadr , socklen_t sadrLen);
+		//bool PrintRemoteInfo( struct addrinfo *ai );
 
 		bool Close();
 
@@ -243,146 +246,6 @@ class Socket {
 			}
 		}
 		operator bool () {return ( sock >= 0 );}
-
-/*
-		bool Open(){
-			int iResult;
-			//struct sockaddr_in serv_addr; 
-			struct addrinfo *result = NULL;
-			struct addrinfo *rp = NULL;
-			struct addrinfo hints;
-
-
-			memset(&hints, 0, sizeof(struct addrinfo));
-			hints.ai_family = AF_INET6;    // Allow IPv4 or IPv6:AF_UNSPEC IPv4:AF_INET IPv6:AF_INET6
-			hints.ai_socktype = SOCK_STREAM; // Datagram socket SOCK_DGRAM SOCK_STREAM
-			hints.ai_flags = AI_PASSIVE;    // For wildcard IP address
-			hints.ai_protocol = 0;          // Any protocol:0 tcp:IPPROTO_TCP
-			hints.ai_canonname = NULL;
-			hints.ai_addr = NULL;
-			hints.ai_next = NULL;
-
-			// Resolve the server address and port
-			iResult = getaddrinfo((host.size())?host.c_str():NULL, port.c_str(), &hints, &result);
-			if ( iResult != 0 ) {
-		        fprintf(stderr, "getaddrinfo failed with error: %s\n", gai_strerror(iResult));
-				return false;
-			}
-			//  getaddrinfo() returns a list of address structures.
-			//   Try each address until we successfully bind(2).
-			//   If socket(2) (or bind(2)) fails, we (close the socket
-			//   and) try the next address. 
-
-
-			// Attempt to connect to an address until one succeeds
-		   for (rp = result; rp != NULL; rp = rp->ai_next) {
-
-				// Create a SOCKET for connecting to server
-				sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-				//sock = socket(AF_INET, SOCK_STREAM, 0);
-				if (sock < 0 ) {
-					fprintf(stderr, "\n Socket creation failed with error %d: %s\n",errno,strerror(errno)); 
-					continue;
-				}
-
-//				serv_addr.sin_family = rp->ai_family; 
-//				serv_addr.sin_port = htons(atoi(port.c_str())); 
-
-				// Convert IPv4 and IPv6 addresses from text to binary form 
-//				iResult = inet_pton(rp->ai_family, host.c_str(), &serv_addr.sin_addr);
-//				if(iResult == 0) { 
-//					fprintf(stderr, "\n Invalid address/ Address not supported %d: %s\n",errno,strerror(errno)); 
-//					Close();
-//					continue;
-//				} else if(iResult <0){
-//					fprintf(stderr, "\n Invalid address family %d: %s\n",errno,strerror(errno)); 
-//					Close();
-//					continue;
-//				}
-
-				//iResult = connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
-				iResult = connect(sock, (struct sockaddr *)rp->ai_addr, sizeof(*(rp->ai_addr)));
-				if ( iResult < 0) { 
-					fprintf(stderr, "\n connect failed with error %d: %s\n",errno,strerror(errno)); 
-					Close();
-					continue;
-				} 
-
-				break;
-			}
-			freeaddrinfo(result); // No longer needed 
-
-			if (sock < 0 ) {
-				fprintf(stderr, "\n Unable to connect to server! \n"); 
-				return false;
-			}
-
-			return true;
-		}
-*/
-
-/*
-		int Accept(){
-
-			int iResult;
-			int opt = 1; 
-			struct sockaddr_in6 address; 
-			int addrlen = sizeof(address); 
-
-			address.sin6_family = AF_INET6; 					// Allow IPv4 or IPv6:AF_UNSPEC IPv4:AF_INET
-			//address.sin6_addr.s6_addr = in6addr_any; 
-			address.sin6_addr = in6addr_any; 
-			address.sin6_port = htons( atoi(port.c_str()) ); 
-
-			//inet_pton(AF_INET6, "::", &address.sin6_addr);
-
-			// Creating socket file descriptor 
-			sock = socket(AF_INET6, SOCK_STREAM, 0);
-			if ( sock < 0 ) 
-			{ 
-				fprintf(stderr, "\n Creating socket failed with error %d: %s\n",errno,strerror(errno)); 
-				sock=INVALID_SOCKET;
-				return INVALID_SOCKET;
-			} 
-
-
-			// Forcefully attaching socket to the port 8080 
-			if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) 
-			{ 
-				fprintf(stderr, "\n setsockopt failed with error %d: %s\n",errno,strerror(errno)); 
-				Close();
-				return INVALID_SOCKET;
-			} 
-
-			// Forcefully attaching socket to the port 8080 
-			if (bind(sock, (struct sockaddr *)&address, sizeof(address) )<0) 
-			{ 
-				fprintf(stderr, "\n bind failed with error %d: %s\n",errno,strerror(errno)); 
-				Close();
-				return INVALID_SOCKET;
-			} 
-
-			iResult = listen(sock, SOMAXCONN); //SOMAXCONN
-			if (iResult < 0) {
-				fprintf(stderr, "\n listen failed with error %d: %s\n",errno,strerror(errno)); 
-				Close();
-				return INVALID_SOCKET;
-			}
-
-			// Accept a client socket
-			int clientSocket = accept(sock, (struct sockaddr *)&address, (socklen_t*)&addrlen);
-			if (clientSocket < 0 ) {
-				fprintf(stderr, "\n accept failed with error %d: %s\n",errno,strerror(errno)); 
-				Close();
-				return INVALID_SOCKET;
-			}
-
-			// No longer need server socket
-			Close();
-			return clientSocket;
-
-		}
-*/
 
 	private:
 		static bool Initialize(){
