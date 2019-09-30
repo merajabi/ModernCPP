@@ -47,6 +47,7 @@ struct addrinfo {
 #include <iostream>
 #include <atomic>
 #include <string>
+#include <vector>
 
 /*
 ** System header files.
@@ -128,6 +129,27 @@ typedef struct sockaddr_in6      sockaddr_in6_t;
 
 static __inline boolean SYSCALL( const char *syscallName, int lineNbr, int status );
 
+class socket_guard {
+	int sock;
+	public:
+		socket_guard(int sock=INVALID_SOCKET):sock(sock){
+		};
+		~socket_guard(){
+			if( sock != INVALID_SOCKET ) {
+				SYSCALL( "close", __LINE__, close( sock ));
+				sock = INVALID_SOCKET;
+			}
+		}
+		int get(){
+			return sock;
+		}
+		int release(){
+			int tmp=sock;
+			sock = INVALID_SOCKET;
+			return tmp;
+		}
+};
+
 class Socket {
 	static std::atomic<unsigned long> sockCount;
 
@@ -135,22 +157,21 @@ class Socket {
 	std::string host;
 	std::string service; // service OR port / DFLT_SERVICE
 	std::string protocol;
+	std::string scope;
 	unsigned long timeout;
 
 	int         cSckt;					// Client Socket
+	struct sockaddr_storage  udpSockStor;
 
-	int         tSckt[ MAXTCPSCKTS ];	/* Array of TCP socket descriptors. */
-	size_t      tScktSize;				/* Size of uSckt (# of elements).   */
-	int         uSckt[ MAXUDPSCKTS ];	/* Array of UDP socket descriptors. */
-	size_t      uScktSize;				/* Size of uSckt (# of elements).   */
+	std::vector<int>         tSckt;	// Array of TCP socket descriptors. MAXTCPSCKTS
+	//	size_t      tScktSize;				/* Size of uSckt (# of elements).   */
+	std::vector<int>         uSckt;	// Array of UDP socket descriptors. MAXUDPSCKTS
+	//	size_t      uScktSize;				/* Size of uSckt (# of elements).   */
 
-	struct sockaddr_storage  sockStor;
+	int openSckt( const char *protocol );
+	int openSckt( unsigned int scopeId );
 
-
-	int openSckt( const char *service, const char *protocol, int desc[ ], size_t maxDescs, size_t *descSize );
-	int openSckt( const char *host, const char *service, unsigned int scopeId, const char *transport );
-
-	int Listen( int tSckt[ ], size_t tScktSize, int uSckt[ ], size_t uScktSize );
+	int Listen( );
 
 	public:
 	/*
@@ -159,7 +180,7 @@ class Socket {
 	static char        hostBfr[ NI_MAXHOST ];   /* For use w/getnameinfo(3).    */
 	static char        servBfr[ NI_MAXSERV ];   /* For use w/getnameinfo(3).    */
 	static const char *pgmName;                 /* Program name w/o dir prefix. */
-	static boolean     verbose;         /* Verbose mode indication.     */
+	static boolean     verbose;       			/* Verbose mode indication.     */
 
 	public:
 		Socket(const int& s);
@@ -180,12 +201,11 @@ class Socket {
 		bool OpenClient();
 
 		bool OpenServer(){
-			return ( openSckt( service.c_str(), "tcp", tSckt, MAXTCPSCKTS, &tScktSize ) && 
-					openSckt( service.c_str(), "udp", uSckt, MAXUDPSCKTS, &uScktSize ) );
+			return ( openSckt( "tcp"  ) && openSckt( "udp" ) );
 		}
 		int Accept(){
-			if ( ( tScktSize > 0 ) || ( uScktSize > 0 ) ) {         
-				return Listen( tSckt, tScktSize, uSckt, uScktSize ); /* tod() never returns. */
+			if ( ( tSckt.size() > 0 ) || ( uSckt.size() > 0 ) ) {         
+				return Listen( ); /* tod() never returns. */
 			}
 		}
 		operator bool () {return ( sock >= 0 );}
