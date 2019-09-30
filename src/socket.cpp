@@ -419,221 +419,158 @@ int Socket::openSckt( const char *service,
 *
 * Return Value: Socket descriptors which has new activity
 ******************************************************************************/
-int Socket::tod( int    tSckt[ ],
-                 size_t tScktSize,
-                 int    uSckt[ ],
-                 size_t uScktSize )
+int Socket::tod( int    tSckt[ ], size_t tScktSize, int    uSckt[ ], size_t uScktSize )
 {
-   char                     bfr[ 256 ];
-   ssize_t                  count;
-   struct pollfd           *desc;
-   size_t                   descSize = tScktSize + uScktSize;
-   int                      idx;
-   int                      newSckt;
-   struct sockaddr         *sadr;
-   socklen_t                sadrLen;
-   struct sockaddr_storage  sockStor;
-   int                      status;
-   size_t                   timeLen;
-   char                    *timeStr;
-   time_t                   timeVal;
-   ssize_t                  wBytes;
+	char                     bfr[ 256 ];
+	ssize_t                  count;
+	struct pollfd           *desc;
+	size_t                   descSize = tScktSize + uScktSize;
+	int                      idx;
+	int                      newSckt;
+	struct sockaddr         *sadr;
+	socklen_t                sadrLen;
+	struct sockaddr_storage  sockStor;
+	int                      status;
+	size_t                   timeLen;
+	char                    *timeStr;
+	time_t                   timeVal;
+	ssize_t                  wBytes;
 
 	sock = INVALID_SOCKET;
 
-   /*
-   ** Allocate memory for the poll(2) array.
-   */
-   desc = (pollfd*)malloc( descSize * sizeof( struct pollfd ) );
-   if ( desc == NULL )
-   {
-      fprintf( stderr,
-               "%s (line %d): ERROR - %s.\n",
-               pgmName,
-               __LINE__,
-               strerror( ENOMEM ) );
-      return INVALID_SOCKET;
-   }
+	/*
+	** Allocate memory for the poll(2) array.
+	*/
+	desc = (pollfd*)malloc( descSize * sizeof( struct pollfd ) );
+	if ( desc == NULL )
+	{
+		fprintf( stderr,
+			"%s (line %d): ERROR - %s.\n",
+			pgmName,
+			__LINE__,
+			strerror( ENOMEM ) );
+		return INVALID_SOCKET;
+	}
 
-   /*
-   ** Initialize the poll(2) array.
-   */
-   for ( idx = 0;     idx < descSize;     idx++ )
-   {
-      desc[ idx ].fd      = idx < tScktSize  ?  tSckt[ idx ]
-                                             :  uSckt[ idx - tScktSize ];
-      desc[ idx ].events  = POLLIN;
-      desc[ idx ].revents = 0;
-   }
-   /*
-   ** Main time-of-day server loop.  Handles both TCP & UDP requests.  This is
-   ** an interative server, and all requests are handled directly within the
-   ** main loop.
-   */
-   while ( true )   /* Do forever. */
-   {
-      /*
-      ** Wait for activity on one of the sockets.  The DO..WHILE construct is
-      ** used to restart the system call in the event the process is
-      ** interrupted by a signal.
-      */
-      do
-      {
-         status = poll( desc,
-                        descSize,
-                        -1 /* Wait indefinitely for input. */ );
-      } while ( ( status < 0 ) && ( errno == EINTR ) );
+	/*
+	** Initialize the poll(2) array.
+	*/
+	for ( idx = 0;     idx < descSize;     idx++ )
+	{
+		desc[ idx ].fd      = idx < tScktSize  ?  tSckt[ idx ]
+				   								  :  uSckt[ idx - tScktSize ];
+		desc[ idx ].events  = POLLIN;
+		desc[ idx ].revents = 0;
+	}
+	/*
+	** Main time-of-day server loop.  Handles both TCP & UDP requests.  This is
+	** an interative server, and all requests are handled directly within the
+	** main loop.
+	*/
+	while ( true )   /* Do forever. */
+	{
+		/*
+		** Wait for activity on one of the sockets.  The DO..WHILE construct is
+		** used to restart the system call in the event the process is
+		** interrupted by a signal.
+		*/
+		do
+		{
+			status = poll( desc,
+							descSize,
+							-1 /* Wait indefinitely for input. */ );
+		} while ( ( status < 0 ) && ( errno == EINTR ) );
 
-      if(!SYSCALL("poll", __LINE__,  status )){   /* Check for a bona fide system call error. */
+		if(!SYSCALL("poll", __LINE__,  status )){   /* Check for a bona fide system call error. */
 			return INVALID_SOCKET;
 		}
 
-      /*
-      ** Get the current time.
-      */
-/*	********************  NOT REQUIRED ********************
-      timeVal = time( NULL );
-      timeStr = ctime( &timeVal );
-      timeLen = strlen( timeStr );
-*/ // ********************  NOT REQUIRED ********************
+		/*
+		** Indicate that there is new network activity.
+		*/
+		if ( verbose )
+		{
+			fprintf( stderr,
+				"%s: New network activity.\n",
+				pgmName);
+		}  /* End IF verbose. */
 
-      /*
-      ** Indicate that there is new network activity.
-      */
-      if ( verbose )
-      {
-         //char *s = (char*)malloc( timeLen+1 );
-         //strcpy( s, timeStr );
-         //s[ timeLen-1 ] = '\0';   /* Overwrite '\n' in date string. */
-         fprintf( stderr,
-                  "%s: New network activity.\n",
-                  pgmName);
-         //free( s );
-      }  /* End IF verbose. */
-      /*
-      ** Process sockets with input available.
-      */
-      for ( idx = 0;     idx < descSize;     idx++ )
-      {
-         switch ( desc[ idx ].revents )
-         {
-            case 0:        /* No activity on this socket; try the next. */
-               continue;
-            case POLLIN:   /* Network activity.  Go process it.         */
-               break;
-            default:       /* Invalid poll events.                      */
-            {
-               fprintf( stderr,
-                        "%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
-                        pgmName,
-                        __LINE__,
-                        desc[ idx ].revents );
-               return INVALID_SOCKET;
-            }
-         }  /* End SWITCH on returned poll events. */
-         /*
-         ** Determine if this is a TCP request or UDP request.
-         */
-         if ( idx < tScktSize )
-         {
-            /*
-            ** TCP connection requested.  Accept it.  Notice the use of
-            ** the sockaddr_storage data type.
-            */
-            sadrLen = sizeof( sockStor );
-            sadr    = (struct sockaddr*) &sockStor;
-            if(!SYSCALL("accept", __LINE__,  newSckt = accept( desc[ idx ].fd,
-                                   sadr,
-                                   &sadrLen ) ) ) {
+		/*
+		** Process sockets with input available.
+		*/
+		for ( idx = 0;     idx < descSize;     idx++ )
+		{
+			switch ( desc[ idx ].revents )
+			{
+				case 0:        /* No activity on this socket; try the next. */
+					continue;
+				case POLLIN:   /* Network activity.  Go process it.         */
+					break;
+				default:       /* Invalid poll events.                      */
+					{
+						fprintf( stderr,
+							"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
+							pgmName,
+							__LINE__,
+							desc[ idx ].revents );
+						return INVALID_SOCKET;
+					}
+			}  /* End SWITCH on returned poll events. */
+			/*
+			** Determine if this is a TCP request or UDP request.
+			*/
+			if ( idx < tScktSize )
+			{
+				/*
+				** TCP connection requested.  Accept it.  Notice the use of
+				** the sockaddr_storage data type.
+				*/
+				sadrLen = sizeof( sockStor );
+				sadr    = (struct sockaddr*) &sockStor;
+				if(!SYSCALL("accept", __LINE__,  newSckt = accept( desc[ idx ].fd, sadr, &sadrLen ) ) ) {
+					return INVALID_SOCKET;
+				}
+				/*	********************  NOT REQUIRED ********************
+				SYSCALL("shutdown", __LINE__,  shutdown( newSckt, SHUT_RD ) );      // Server never recv's anything.
+				
+				*/ // ********************  NOT REQUIRED ********************
+
+				{
+					struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
+					PrintAddrInfo(&saddri);
+				}
+
+
+				/*	********************  NOT REQUIRED ********************
+				SYSCALL("close", __LINE__,  close( newSckt ) );
+				*/ // ********************  NOT REQUIRED ********************
+
+			}  /* End IF this was a TCP connection request. */
+			else
+			{
+
+
+			}  /* End ELSE a UDP datagram is available. */
+			desc[ idx ].revents = 0;   /* Clear the returned poll events. */
+
+			//	********************  Added for Socket Class ********************
+			if ( idx < tScktSize ){
+				return newSckt;
+			}else{
+				sock = desc[ idx ].fd;
 				return INVALID_SOCKET;
 			}
-/*	********************  NOT REQUIRED ********************
-            SYSCALL("shutdown", __LINE__,  shutdown( newSckt,       // Server never recv's anything.
-                           SHUT_RD ) );
-*/ // ********************  NOT REQUIRED ********************
+			//	********************  Added for Socket Class ********************
 
-			{
-				struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
-				PrintAddrInfo(&saddri);
-			}
-
-            /*
-            ** Send the TOD to the client.
-            */
-/*	********************  NOT REQUIRED ********************
-            wBytes = timeLen;
-            while ( wBytes > 0 )
-            {
-               do
-               {
-                  count = write( newSckt,
-                                 timeStr,
-                                 wBytes );
-               } while ( ( count < 0 ) && ( errno == EINTR ) );
-               SYSCALL("write", __LINE__,  count );   // Check for a bona fide error. 
-               wBytes -= count;
-            }  // End WHILE there is data to send. 
-*/ // ********************  NOT REQUIRED ********************
-
-/*	********************  NOT REQUIRED ********************
-            SYSCALL("close", __LINE__,  close( newSckt ) );
-*/ // ********************  NOT REQUIRED ********************
-
-         }  /* End IF this was a TCP connection request. */
-         else
-         {
-
-/*	********************  NOT REQUIRED ********************
-            SYSCALL("recvfrom", __LINE__,  count = recvfrom( desc[ idx ].fd,
-                                   bfr,
-                                   sizeof( bfr ),
-                                   0,
-                                   sadr,
-                                   &sadrLen ) );
-*/ // ********************  NOT REQUIRED ********************
-
-			/*
-            ** Send the time-of-day to the client.
-            */
-/*	********************  NOT REQUIRED ********************
-            wBytes = timeLen;
-            while ( wBytes > 0 )
-            {
-               do
-               {
-                  count = sendto( desc[ idx ].fd,
-                                  timeStr,
-                                  wBytes,
-                                  0,
-                                  sadr,        // Address & address length   
-                                  sadrLen );   //    received in recvfrom(). 
-               } while ( ( count < 0 ) && ( errno == EINTR ) );
-               SYSCALL("sendto", __LINE__,  count );   // Check for a bona fide error. 
-               wBytes -= count;
-            }  // End WHILE there is data to send. 
-*/ // ********************  NOT REQUIRED ********************
-
-         }  /* End ELSE a UDP datagram is available. */
-         desc[ idx ].revents = 0;   /* Clear the returned poll events. */
-
-//	********************  Added for Socket Class ********************
-		if ( idx < tScktSize ){
-			return newSckt;
-		}else{
-			sock = desc[ idx ].fd;
-			return INVALID_SOCKET;
-		}
-//	********************  Added for Socket Class ********************
-
-      }  /* End FOR each socket descriptor. */
-   }  /* End WHILE forever. */
+		}  /* End FOR each socket descriptor. */
+	}  /* End WHILE forever. */
 }  /* End tod() */
 
 /******************************************************************************
 * Function: openSckt
 *
 * Description:
-*    Sets up a TCP connection to a remote server.  Getaddrinfo(3) is used to
+*    Sets up a UDP/TCP socket to a remote server.  Getaddrinfo(3) is used to
 *    perform lookup functions and can return multiple address records (i.e. a
 *    list of 'struct addrinfo' records).  This function traverses the list and
 *    tries to establish a connection to the remote server.  The function ends
@@ -646,131 +583,7 @@ int Socket::tod( int    tSckt[ ],
 *    service - A pointer to a character string representing the service name or
 *              well-known port number.
 *    scopeId - For IPv6 sockets only.  This is the index corresponding to the
-*              network interface on which to set up the connection.  This
-*              parameter is ignored for IPv4 sockets or when an IPv6 "scoped
-*              address" is specified in 'host' (i.e. where the colon-hex
-*              network address is augmented with the scope ID).
-*
-* Return Value:
-*    Returns the socket descriptor for the connection, or INVALID_DESC if all
-*    address records have been processed and a connection could not be
-*    established.
-******************************************************************************/
-int Socket::openScktTC( const char   *host,
-                     const char   *service,
-                     unsigned int  scopeId )
-{
-   struct addrinfo *ai;
-   int              aiErr;
-   struct addrinfo *aiHead;
-   struct addrinfo  hints;
-   sockaddr_in6_t  *pSadrIn6;
-   int              sckt;
-   /*
-   ** Initialize the 'hints' structure for getaddrinfo(3).
-   **
-   ** Notice that the 'ai_family' field is set to PF_UNSPEC, indicating to
-   ** return both IPv4 and IPv6 address records for the host/service.  Most of
-   ** the time, the user isn't going to care whether an IPv4 connection or an
-   ** IPv6 connection is established; the user simply wants to exchange data
-   ** with the remote host and doesn't care how it's done.  Sometimes, however,
-   ** the user might want to explicitly specify the type of underlying socket.
-   ** It is left as an exercise for the motivated reader to add a command line
-   ** option allowing the user to specify the IP protocol, and then process the
-   ** list of addresses accordingly (it's not that difficult).
-   */
-   memset( &hints, 0, sizeof( hints ) );
-   hints.ai_family   = PF_UNSPEC;     /* IPv4 or IPv6 records (don't care). */
-   hints.ai_socktype = SOCK_STREAM;   /* Connection-oriented byte stream.   */
-   hints.ai_protocol = IPPROTO_TCP;   /* TCP transport layer protocol only. */
-   /*
-   ** Look up the host/service information.
-   */
-   if ( ( aiErr = getaddrinfo( host,
-                               service,
-                               &hints,
-                               &aiHead ) ) != 0 )
-   {
-      fprintf( stderr,
-               "%s (line %d): ERROR - %s.\n",
-               pgmName,
-               __LINE__,
-               gai_strerror( aiErr ) );
-      return INVALID_DESC;
-   }
-   /*
-   ** Go through the list and try to open a connection.  Continue until either
-   ** a connection is established or the entire list is exhausted.
-   */
-   for ( ai = aiHead,   sckt = INVALID_DESC;
-         ( ai != NULL ) && ( sckt == INVALID_DESC );
-         ai = ai->ai_next )
-   {
-      /*
-      ** IPv6 kluge.  Make sure the scope ID is set.
-      */
-      if ( ai->ai_family == PF_INET6 )
-      {
-         pSadrIn6 = (sockaddr_in6_t*) ai->ai_addr;
-         if ( pSadrIn6->sin6_scope_id == 0 )
-         {
-            pSadrIn6->sin6_scope_id = scopeId;
-         }  /* End IF the scope ID wasn't set. */
-      }  /* End IPv6 kluge. */
-
-		PrintAddrInfo(ai); //PrintRemoteInfo(ai);
-
-      /*
-      ** Create a socket.
-      */
-      if ( !SYSCALL( "socket",
-                     __LINE__,
-                     sckt = socket( ai->ai_family,
-                                    ai->ai_socktype,
-                                    ai->ai_protocol ) ) )
-      {
-         sckt = INVALID_DESC;
-         continue;   /* Try the next address record in the list. */
-      }
-      /*
-      ** Connect to the remote host.
-      */
-      if ( !SYSCALL( "connect",
-                     __LINE__,
-                     connect( sckt,
-                              ai->ai_addr,
-                              ai->ai_addrlen ) ) )
-      {
-         (void) close( sckt );   /* Could use SYSCALL() again here, but why? */
-         sckt = INVALID_DESC;
-         continue;   /* Try the next address record in the list. */
-      }
-   }  /* End FOR each address record returned by getaddrinfo(3). */
-   /*
-   ** Clean up & return.
-   */
-   freeaddrinfo( aiHead );
-   return sckt;
-}  /* End openSckt() */
-
-/******************************************************************************
-* Function: openSckt
-*
-* Description:
-*    Sets up a UDP socket to a remote server.  Getaddrinfo(3) is used to
-*    perform lookup functions and can return multiple address records (i.e. a
-*    list of 'struct addrinfo' records).  This function traverses the list and
-*    tries to establish a connection to the remote server.  The function ends
-*    when either a connection has been established or all records in the list
-*    have been processed.
-*
-* Parameters:
-*    host    - A pointer to a character string representing the hostname or IP
-*              address (IPv4 or IPv6) of the remote server.
-*    service - A pointer to a character string representing the service name or
-*              well-known port number.
-*    scopeId - For IPv6 sockets only.  This is the index corresponding to the
-*              network interface on which to exchange datagrams.  This
+*              network interface on which to exchange datagrams/streams.  This
 *              parameter is ignored for IPv4 sockets or when an IPv6 "scoped
 *              address" is specified in 'host' (i.e. where the colon-hex
 *              network address is augmented with the scope ID).
@@ -779,9 +592,10 @@ int Socket::openScktTC( const char   *host,
 *    Returns the socket descriptor for the connection, or INVALID_DESC if all
 *    address records have been processed and a socket could not be initialized.
 ******************************************************************************/
-int Socket::openScktUC( const char   *host,
+int Socket::openSckt( const char   *host,
                      const char   *service,
-                     unsigned int  scopeId )
+                     unsigned int  scopeId,
+					const char   *transport )
 {
    struct addrinfo *ai;
    int              aiErr;
@@ -804,8 +618,17 @@ int Socket::openScktUC( const char   *host,
    */
    memset( &hints, 0, sizeof( hints ) );
    hints.ai_family   = PF_UNSPEC;     /* IPv4 or IPv6 records (don't care). */
-   hints.ai_socktype = SOCK_DGRAM;    /* Connectionless communication.      */
-   hints.ai_protocol = IPPROTO_UDP;   /* UDP transport layer protocol only. */
+	if(std::string(transport)=="tcp") {
+		hints.ai_socktype = SOCK_STREAM;   /* Connection-oriented byte stream.   */
+		hints.ai_protocol = IPPROTO_TCP;   /* TCP transport layer protocol only. */
+	}
+	else if(std::string(transport)=="udp"){
+		hints.ai_socktype = SOCK_DGRAM;   /* Connectionless communication.   */
+		hints.ai_protocol = IPPROTO_UDP;   /* UDP transport layer protocol only. */
+	}
+	else{
+		return INVALID_DESC;
+	}
    /*
    ** Look up the host/service information.
    */
@@ -856,8 +679,8 @@ int Socket::openScktUC( const char   *host,
          continue;   /* Try the next address record in the list. */
       }
       /*
-      ** Set the target destination for the remote host on this socket.  That
-      ** is, this socket only communicates with the specified host.
+      ** Set the target destination for the remote host on this socket.
+      ** That is, this socket only communicates with the specified host.
       */
       if ( !SYSCALL( "connect",
                      __LINE__,

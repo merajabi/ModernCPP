@@ -188,8 +188,7 @@ class Socket {
 
 
 	int openSckt( const char *service, const char *protocol, int desc[ ], size_t maxDescs, size_t *descSize );
-	int openScktTC( const char *host, const char *service, unsigned int scopeId );
-	int openScktUC( const char *host, const char *service, unsigned int scopeId );
+	int openSckt( const char *host, const char *service, unsigned int scopeId, const char *transport );
 
 	int tod( int tSckt[ ], size_t tScktSize, int uSckt[ ], size_t uScktSize );
 
@@ -235,9 +234,7 @@ class Socket {
 		   unsigned int  scopeId  = if_nametoindex( DFLT_SCOPE_ID );
 		  fprintf( stderr, " scopeName: %s scopeId: %d \n",DFLT_SCOPE_ID,scopeId);
 
-		   if ( ( cSckt = openScktTC( host.c_str(),
-					               service.c_str(),
-					               scopeId ) ) == INVALID_DESC )
+		   if ( ( cSckt = openSckt( host.c_str(), service.c_str(), scopeId, "tcp" ) ) == INVALID_DESC )
 		   {
 			  fprintf( stderr,
 					   "%s: Sorry... a connection could not be established.\n",
@@ -264,9 +261,7 @@ class Socket {
 		   unsigned int  scopeId  = if_nametoindex( DFLT_SCOPE_ID );
 		  fprintf( stderr, " scopeName: %s scopeId: %d \n",DFLT_SCOPE_ID,scopeId);
 
-		   if ( ( cSckt = openScktUC( host.c_str(),
-				                   service.c_str(),
-				                   scopeId ) ) == INVALID_DESC )
+		   if ( ( cSckt = openSckt( host.c_str(), service.c_str(), scopeId, "udp" ) ) == INVALID_DESC )
 		   {
 			  fprintf( stderr,
 				       "%s: Sorry... a connectionless socket could "
