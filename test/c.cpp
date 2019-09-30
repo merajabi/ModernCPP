@@ -28,14 +28,7 @@ int main(int argc, char **argv) {
 
 	{
 		Socket c(peerName, peerPort, peerProtocol);
-		if(peerProtocol=="tcp"){
-			c.OpenTcpClient();
-		}else if(peerProtocol=="udp"){
-			c.OpenUdpClient();
-		}else {
-			std::cerr << "Unknown Protocol: " << peerProtocol<< std::endl;
-			return 1;
-		}
+		c.OpenClient();
 
 		c.SetTimeout(5*1000);
 		std::string str(" \
@@ -58,10 +51,10 @@ int main(int argc, char **argv) {
 		//std::string str("this is a test.");
 
 		std::cout << str.size() << std::endl;
-		c.SendTC(str);
+		c.SendTCP(str);
 
 		std::string res;
-		c.RecvTC(res,9); //9
+		c.RecvTCP(res,9); //9
 		//c.Close();
 		std::cout << res.size() << std::endl;
 	}

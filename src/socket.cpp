@@ -16,7 +16,7 @@ boolean SYSCALL( const char *syscallName, int lineNbr, int status ) {
                syscallName,
                strerror( errno ) );
    }
-   return status != -1;   /* True if the system call was successful. */
+   return (status != -1);   /* True if the system call was successful. */
 }  /* End SYSCALL() */
 
 
@@ -87,10 +87,8 @@ bool Socket::SetTimeout(unsigned long tout){
 	}
 	return true;
 }
-/*
-** Send the TOD to the client.
-*/
-bool Socket::SendTC(const std::string& buffer){
+
+bool Socket::SendTCP(const std::string& buffer){
 	if( !SYSCALL("SendTC", __LINE__,  sock )){
 		return false;
 	}
@@ -110,10 +108,7 @@ bool Socket::SendTC(const std::string& buffer){
 	return true;
 }
 
-/*
-** Send the time-of-day to the client.
-*/
-bool Socket::SendUC(const std::string& buffer){
+bool Socket::SendUDP(const std::string& buffer){
 	if( !SYSCALL("SendTC", __LINE__,  sock )){
 		return false;
 	}
@@ -142,6 +137,27 @@ bool Socket::SendUC(const std::string& buffer){
 
 }
 
+// Receive until the peer closes the connection or read recvbuflen bytes
+bool Socket::RecvTCP(std::string& buffer, int recvbuflen){
+	if( !SYSCALL("RecvTC", __LINE__,  sock )){
+		return false;
+	}
+	ssize_t inBytes;
+	do {
+		char recvbuf[DEFAULT_BUFLEN];
+		inBytes = read(sock, recvbuf, (recvbuflen<DEFAULT_BUFLEN)?recvbuflen:DEFAULT_BUFLEN);
+		if(inBytes > 0){
+			buffer+=std::string(recvbuf,recvbuf+inBytes);
+			recvbuflen-=inBytes;
+		}
+		else if( (inBytes < 0) && (errno != EAGAIN ) ){
+			SYSCALL("read", __LINE__,  inBytes );
+			return false;
+		}
+	} while( inBytes > 0 && recvbuflen > 0 );
+	return true;
+}
+
 /*
 ** This is a UDP socket, and a datagram is available.  The funny
 ** thing about UDP requests is that this server doesn't require any
@@ -152,7 +168,7 @@ bool Socket::SendUC(const std::string& buffer){
 ** is irrelevant.  Read in the datagram.  Again note the use of
 ** sockaddr_storage to receive the address.
 */
-bool Socket::RecvUC(std::string& buffer, int recvbuflen) {
+bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
 	if( !SYSCALL("RecvUC", __LINE__,  sock )){
 		return false;
 	}
@@ -182,26 +198,31 @@ bool Socket::RecvUC(std::string& buffer, int recvbuflen) {
 	return result;
 }
 
-// Receive until the peer closes the connection or read recvbuflen bytes
-bool Socket::RecvTC(std::string& buffer, int recvbuflen){
-	if( !SYSCALL("RecvTC", __LINE__,  sock )){
+/*
+** Open a connection to the indicated host/service.
+**
+** Note that if all three of the following conditions are met, then the
+** scope identifier remains unresolved at this point.
+**    1) The default network interface is unknown for some reason.
+**    2) The -s option was not used on the command line.
+**    3) An IPv6 "scoped address" was not specified for the hostname on the
+**       command line.
+** If the above three conditions are met, then only an IPv4 socket can be
+** opened (connect(2) fails without the scope ID properly set for IPv6
+** sockets).
+*/
+bool Socket::OpenClient(){
+	unsigned int  scopeId  = if_nametoindex( DFLT_SCOPE_ID );
+	cSckt = openSckt( host.c_str(), service.c_str(), scopeId, protocol.c_str() );
+
+	if ( !SYSCALL( "OpenClient", __LINE__, cSckt )  ) {
 		return false;
 	}
-	ssize_t inBytes;
-	do {
-		char recvbuf[DEFAULT_BUFLEN];
-		inBytes = read(sock, recvbuf, (recvbuflen<DEFAULT_BUFLEN)?recvbuflen:DEFAULT_BUFLEN);
-		if(inBytes > 0){
-			buffer+=std::string(recvbuf,recvbuf+inBytes);
-			recvbuflen-=inBytes;
-		}
-		else if( (inBytes < 0) && (errno != EAGAIN ) ){
-			SYSCALL("read", __LINE__,  inBytes );
-			return false;
-		}
-	} while( inBytes > 0 && recvbuflen > 0 );
+	sock = cSckt;
 	return true;
+
 }
+
 
 /******************************************************************************
 * Function: openSckt
@@ -235,21 +256,12 @@ int Socket::openSckt( const char *service,
 					size_t		maxDescs,
                      size_t     *descSize )
 {
-   struct addrinfo *ai;
    int              aiErr;
+   struct addrinfo *ai;
    struct addrinfo *aiHead;
    struct addrinfo  hints    = { .ai_flags  = AI_PASSIVE,    /* Server mode. */
                                  .ai_family = PF_UNSPEC };   /* IPv4 or IPv6. */
-   //size_t           maxDescs = *descSize;
-   /*
-   ** Initialize output parameters.  When the loop completes, *descSize is 0.
-   */
-/*
-   while ( *descSize > 0 )
-   {
-      desc[ --( *descSize ) ] = INVALID_DESC;
-   }
-*/
+
 	for (size_t i=0; i < maxDescs; i++){
 		desc[ i ] = INVALID_DESC;
 	}
@@ -283,18 +295,10 @@ int Socket::openSckt( const char *service,
    ** The network address is initialized to :: (all zeros) for IPv6 records, or
    ** 0.0.0.0 for IPv4 records.
    */
-   if ( ( aiErr = getaddrinfo( NULL,
-                               service,
-                               &hints,
-                               &aiHead ) ) != 0 )
-   {
-      fprintf( stderr,
-               "%s (line %d): ERROR - %s.\n",
-               pgmName,
-               __LINE__,
-               gai_strerror( aiErr ) );
+   if ( !SYSCALL("getaddrinfo", __LINE__, getaddrinfo( NULL, service, &hints, &aiHead ) ) ) { //gai_strerror( aiErr )
       return false;
    }
+
    /*
    ** For each of the address records returned, attempt to set up a passive
    ** socket.
@@ -373,10 +377,8 @@ int Socket::openSckt( const char *service,
       ** If this is a TCP socket, put the socket into passive listening mode
       ** (listen is only valid on connection-oriented sockets).
       */
-      if ( ai->ai_socktype == SOCK_STREAM )
-      {
-         if(!SYSCALL("listen", __LINE__,  listen( desc[ *descSize ],
-                      MAXCONNQLEN ) ) ){
+      if ( ai->ai_socktype == SOCK_STREAM ) {
+         if( !SYSCALL("listen", __LINE__,  listen( desc[ *descSize ], MAXCONNQLEN ) ) ){
 				return false;
 			}
       }
@@ -405,7 +407,7 @@ int Socket::openSckt( const char *service,
 
 
 /******************************************************************************
-* Function: tod
+* Function: Listen
 *
 * Description:
 *    Listen on a set of sockets and send the current time-of-day to any
@@ -419,22 +421,20 @@ int Socket::openSckt( const char *service,
 *
 * Return Value: Socket descriptors which has new activity
 ******************************************************************************/
-int Socket::tod( int    tSckt[ ], size_t tScktSize, int    uSckt[ ], size_t uScktSize )
+int Socket::Listen( int    tSckt[ ], size_t tScktSize, int    uSckt[ ], size_t uScktSize )
 {
-	char                     bfr[ 256 ];
-	ssize_t                  count;
+//	char                     bfr[ 256 ];
+//	ssize_t                  count;
 	struct pollfd           *desc;
 	size_t                   descSize = tScktSize + uScktSize;
 	int                      idx;
 	int                      newSckt;
-	struct sockaddr         *sadr;
-	socklen_t                sadrLen;
-	struct sockaddr_storage  sockStor;
+
 	int                      status;
-	size_t                   timeLen;
-	char                    *timeStr;
-	time_t                   timeVal;
-	ssize_t                  wBytes;
+//	size_t                   timeLen;
+//	char                    *timeStr;
+//	time_t                   timeVal;
+//	ssize_t                  wBytes;
 
 	sock = INVALID_SOCKET;
 
@@ -442,8 +442,7 @@ int Socket::tod( int    tSckt[ ], size_t tScktSize, int    uSckt[ ], size_t uSck
 	** Allocate memory for the poll(2) array.
 	*/
 	desc = (pollfd*)malloc( descSize * sizeof( struct pollfd ) );
-	if ( desc == NULL )
-	{
+	if ( desc == NULL )	{
 		fprintf( stderr,
 			"%s (line %d): ERROR - %s.\n",
 			pgmName,
@@ -455,8 +454,7 @@ int Socket::tod( int    tSckt[ ], size_t tScktSize, int    uSckt[ ], size_t uSck
 	/*
 	** Initialize the poll(2) array.
 	*/
-	for ( idx = 0;     idx < descSize;     idx++ )
-	{
+	for ( idx = 0;     idx < descSize;     idx++ ) {
 		desc[ idx ].fd      = idx < tScktSize  ?  tSckt[ idx ]
 				   								  :  uSckt[ idx - tScktSize ];
 		desc[ idx ].events  = POLLIN;
@@ -467,18 +465,14 @@ int Socket::tod( int    tSckt[ ], size_t tScktSize, int    uSckt[ ], size_t uSck
 	** an interative server, and all requests are handled directly within the
 	** main loop.
 	*/
-	while ( true )   /* Do forever. */
-	{
+	while ( true ) {  /* Do forever. */
 		/*
 		** Wait for activity on one of the sockets.  The DO..WHILE construct is
 		** used to restart the system call in the event the process is
 		** interrupted by a signal.
 		*/
-		do
-		{
-			status = poll( desc,
-							descSize,
-							-1 /* Wait indefinitely for input. */ );
+		do {
+			status = poll( desc, descSize, -1 ); /* Wait indefinitely for input. */
 		} while ( ( status < 0 ) && ( errno == EINTR ) );
 
 		if(!SYSCALL("poll", __LINE__,  status )){   /* Check for a bona fide system call error. */
@@ -488,8 +482,7 @@ int Socket::tod( int    tSckt[ ], size_t tScktSize, int    uSckt[ ], size_t uSck
 		/*
 		** Indicate that there is new network activity.
 		*/
-		if ( verbose )
-		{
+		if ( verbose ) {
 			fprintf( stderr,
 				"%s: New network activity.\n",
 				pgmName);
@@ -498,10 +491,8 @@ int Socket::tod( int    tSckt[ ], size_t tScktSize, int    uSckt[ ], size_t uSck
 		/*
 		** Process sockets with input available.
 		*/
-		for ( idx = 0;     idx < descSize;     idx++ )
-		{
-			switch ( desc[ idx ].revents )
-			{
+		for ( idx = 0;     idx < descSize;     idx++ ) {
+			switch ( desc[ idx ].revents ) {
 				case 0:        /* No activity on this socket; try the next. */
 					continue;
 				case POLLIN:   /* Network activity.  Go process it.         */
@@ -519,15 +510,20 @@ int Socket::tod( int    tSckt[ ], size_t tScktSize, int    uSckt[ ], size_t uSck
 			/*
 			** Determine if this is a TCP request or UDP request.
 			*/
-			if ( idx < tScktSize )
-			{
+			if ( idx < tScktSize ) {
 				/*
 				** TCP connection requested.  Accept it.  Notice the use of
 				** the sockaddr_storage data type.
 				*/
-				sadrLen = sizeof( sockStor );
+				struct sockaddr_storage  sockStor;
+				struct sockaddr         *sadr;
+				socklen_t                sadrLen;
+
 				sadr    = (struct sockaddr*) &sockStor;
-				if(!SYSCALL("accept", __LINE__,  newSckt = accept( desc[ idx ].fd, sadr, &sadrLen ) ) ) {
+				sadrLen = sizeof( sockStor );
+				newSckt = accept( desc[ idx ].fd, sadr, &sadrLen );
+
+				if(!SYSCALL("accept", __LINE__, newSckt ) ) {
 					return INVALID_SOCKET;
 				}
 				/*	********************  NOT REQUIRED ********************
@@ -546,17 +542,16 @@ int Socket::tod( int    tSckt[ ], size_t tScktSize, int    uSckt[ ], size_t uSck
 				*/ // ********************  NOT REQUIRED ********************
 
 			}  /* End IF this was a TCP connection request. */
-			else
-			{
+			else {
 
 
 			}  /* End ELSE a UDP datagram is available. */
 			desc[ idx ].revents = 0;   /* Clear the returned poll events. */
 
 			//	********************  Added for Socket Class ********************
-			if ( idx < tScktSize ){
+			if ( idx < tScktSize ) {
 				return newSckt;
-			}else{
+			} else {
 				sock = desc[ idx ].fd;
 				return INVALID_SOCKET;
 			}
