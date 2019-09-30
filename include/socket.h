@@ -75,8 +75,8 @@ struct addrinfo {
 #define MAXBFRSIZE			256         /* Max bfr sz to read remote TOD.    */
 #define DEFAULT_BUFLEN		256
 #define MAXCONNQLEN			3           /* Max nbr of connection requests to queue. */
-#define MAXTCPSCKTS			2           /* One TCP socket for IPv4 & one for IPv6.  */
-#define MAXUDPSCKTS			2           /* One UDP socket for IPv4 & one for IPv6.  */
+//#define MAXTCPSCKTS			2           /* One TCP socket for IPv4 & one for IPv6.  */
+//#define MAXUDPSCKTS			2           /* One UDP socket for IPv4 & one for IPv6.  */
 #define VALIDOPTS			"v"         /* Valid command options.                   */
 //#define VALIDOPTS			"s:v"       /* Valid command options.            */
 
@@ -104,7 +104,7 @@ typedef struct sockaddr_in6      sockaddr_in6_t;
            {                                                        \
               fprintf( stderr,                                      \
                        "%s (line %d): System call ERROR - %s.\n",   \
-                       pgmName,                                     \
+                       "Socket",                                     \
                        __LINE__,                                    \
                        strerror( errno ) );                         \
               exit( 1 );                                            \
@@ -151,36 +151,30 @@ class socket_guard {
 };
 
 class Socket {
-	static std::atomic<unsigned long> sockCount;
+		static std::atomic<unsigned long> sockCount;
 
-    int sock;						// Active Socket
-	std::string host;
-	std::string service; // service OR port / DFLT_SERVICE
-	std::string protocol;
-	std::string scope;
-	unsigned long timeout;
+		std::string				host;
+		std::string				service; // service OR port / DFLT_SERVICE
+		std::string				protocol;
+		std::string				scope;
+		unsigned long timeout;
 
-	int         cSckt;					// Client Socket
-	struct sockaddr_storage  udpSockStor;
+		int 					sock;	// Active Socket
+		int         			cSckt;	// Client Socket
+		std::vector<int>        tSckt;	// Array of TCP socket descriptors. MAXTCPSCKTS
+		std::vector<int>        uSckt;	// Array of UDP socket descriptors. MAXUDPSCKTS
 
-	std::vector<int>         tSckt;	// Array of TCP socket descriptors. MAXTCPSCKTS
-	//	size_t      tScktSize;				/* Size of uSckt (# of elements).   */
-	std::vector<int>         uSckt;	// Array of UDP socket descriptors. MAXUDPSCKTS
-	//	size_t      uScktSize;				/* Size of uSckt (# of elements).   */
+		struct sockaddr_storage  udpSockStor;
 
-	int openSckt( const char *protocol );
-	int openSckt( unsigned int scopeId );
-
-	int Listen( );
+		int openServerSckt( const std::string& service, const std::string& protocol );
+		int openClientSckt( );
+		int Listen( );
 
 	public:
-	/*
-	** Global (within this file only) data objects.
-	*/
-	static char        hostBfr[ NI_MAXHOST ];   /* For use w/getnameinfo(3).    */
-	static char        servBfr[ NI_MAXSERV ];   /* For use w/getnameinfo(3).    */
-	static const char *pgmName;                 /* Program name w/o dir prefix. */
-	static boolean     verbose;       			/* Verbose mode indication.     */
+		/*
+		** Global (within this file only) data objects.
+		*/
+		static boolean     verbose;       			/* Verbose mode indication.     */
 
 	public:
 		Socket(const int& s);
@@ -200,8 +194,8 @@ class Socket {
 
 		bool OpenClient();
 
-		bool OpenServer(){
-			return ( openSckt( "tcp"  ) && openSckt( "udp" ) );
+		bool OpenServer(const std::string& service, const std::string& protocol){
+			return ( openServerSckt( service, protocol ) ); //openServerSckt( "tcp"  ) && openServerSckt( "udp" )
 		}
 		int Accept(){
 			if ( ( tSckt.size() > 0 ) || ( uSckt.size() > 0 ) ) {         

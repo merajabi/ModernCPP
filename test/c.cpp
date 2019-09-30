@@ -22,8 +22,6 @@ int main(int argc, char **argv) {
    /*
    ** Determine the program name (w/o directory prefix).
    */
-	Socket::pgmName = (const char*) strrchr( argv[ 0 ], '/' );
-	Socket::pgmName = Socket::pgmName == NULL  ?  argv[ 0 ]  :  Socket::pgmName+1;
 	Socket::verbose = true;
 
 	{

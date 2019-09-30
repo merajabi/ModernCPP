@@ -23,13 +23,12 @@ void Handel(std::unique_ptr<Socket> sp){
 
 int main(int argc, char **argv) {
 
-	Socket::pgmName = (const char*) strrchr( argv[ 0 ], '/' );
-	Socket::pgmName = Socket::pgmName == NULL  ?  argv[ 0 ]  :  Socket::pgmName+1;
 	Socket::verbose = true;
 
 	{
 		Socket s(DFLT_HOST,"8080");
-		if(s.OpenServer()){
+
+		if(s.OpenServer("8080","tcp") && s.OpenServer("8080","udp")){
 			while(i<1){
 				std::unique_ptr<Socket> sp(new Socket(s.Accept()));
 				if(*sp){

@@ -2,16 +2,16 @@
 #include "socket.h"
 
 std::atomic<unsigned long> Socket::sockCount(0);
-char        Socket::hostBfr[ NI_MAXHOST ];   /* For use w/getnameinfo(3).    */
-char        Socket::servBfr[ NI_MAXSERV ];   /* For use w/getnameinfo(3).    */
-const char *Socket::pgmName=NULL;            /* Program name w/o dir prefix. */
+//char        Socket::hostBfr[ NI_MAXHOST ];   /* For use w/getnameinfo(3).    */
+//char        Socket::servBfr[ NI_MAXSERV ];   /* For use w/getnameinfo(3).    */
+//const char *Socket::pgmName=NULL;            /* Program name w/o dir prefix. */
 boolean     Socket::verbose = false;         /* Verbose mode indication.     */
 
 boolean SYSCALL( const char *syscallName, int lineNbr, int status ) {
    if ( ( status == -1 ) && Socket::verbose ) {
       fprintf( stderr,
                "%s (line %d): System call failed ('%s') - %s.\n",
-               Socket::pgmName,
+               "Socket",
                lineNbr,
                syscallName,
                strerror( errno ) );
@@ -212,7 +212,7 @@ bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
 ** sockets).
 */
 bool Socket::OpenClient(){
-	cSckt = openSckt( 0u );
+	cSckt = openClientSckt( );
 
 	if ( !SYSCALL( "OpenClient", __LINE__, cSckt )  ) {
 		return false;
@@ -249,7 +249,7 @@ bool Socket::OpenClient(){
 * Return Value:
 *    0 on success, -1 on error.
 ******************************************************************************/
-int Socket::openSckt( const char *protocol ) {
+int Socket::openServerSckt( const std::string& service, const std::string& protocol ) {
    struct addrinfo *ai;
    struct addrinfo *aiHead;
    struct addrinfo  hints    = { .ai_flags  = AI_PASSIVE,    /* Server mode. */
@@ -258,12 +258,12 @@ int Socket::openSckt( const char *protocol ) {
    /*
    ** Check which protocol is selected (only TCP and UDP are valid).
    */
-   if ( strcmp( protocol, "tcp" ) == 0 )        /* TCP protocol.     */
+   if ( protocol == "tcp" )        /* TCP protocol.     */
    {
       hints.ai_socktype = SOCK_STREAM;
       hints.ai_protocol = IPPROTO_TCP;
    }
-   else if ( strcmp( protocol, "udp" ) == 0 )   /* UDP protocol.     */
+   else if ( protocol == "udp" )   /* UDP protocol.     */
    {
       hints.ai_socktype = SOCK_DGRAM;
       hints.ai_protocol = IPPROTO_UDP;
@@ -273,9 +273,9 @@ int Socket::openSckt( const char *protocol ) {
       fprintf( stderr,
                "%s (line %d): ERROR - Unknown transport "
                "layer protocol \"%s\".\n",
-               pgmName,
+               "Socket",
                __LINE__,
-               protocol );
+               protocol.c_str() );
       return false;
    }
    /*
@@ -351,7 +351,7 @@ int Socket::openSckt( const char *protocol ) {
          fprintf( stderr,
                   "%s (line %d): WARNING - Cannot set IPV6_V6ONLY socket "
                   "option.  Closing IPv6 %s socket.\n",
-                  pgmName,
+                  "Socket",
                   __LINE__,
                   ai->ai_protocol == IPPROTO_TCP  ?  "TCP"  :  "UDP" );
          //SYSCALL("close", __LINE__,  close( tempSock ) );
@@ -380,10 +380,10 @@ int Socket::openSckt( const char *protocol ) {
       /*
       ** Socket set up okay.  Bump index to next descriptor array element.
       */
-		if ( strcmp( protocol, "tcp" ) == 0 ) {      /* TCP protocol.     */
+		if ( protocol == "tcp" ) {      /* TCP protocol.     */
 			tSckt.push_back(sg.release());
 		}
-		else if ( strcmp( protocol, "udp" ) == 0 ) {  /* UDP protocol.     */
+		else if ( protocol == "udp" ) {  /* UDP protocol.     */
 			uSckt.push_back(sg.release());
 		}
    }  /* End FOR each address info structure returned. */
@@ -425,7 +425,7 @@ int Socket::Listen() {
 	if ( desc == NULL )	{
 		fprintf( stderr,
 			"%s (line %d): ERROR - %s.\n",
-			pgmName,
+			"Socket",
 			__LINE__,
 			strerror( ENOMEM ) );
 		return INVALID_SOCKET;
@@ -483,7 +483,7 @@ int Socket::Listen() {
 		** Indicate that there is new network activity.
 		*/
 		if ( verbose ) {
-			fprintf( stderr, "%s: New network activity.\n", pgmName);
+			fprintf( stderr, "%s: New network activity.\n", "Socket");
 		}  /* End IF verbose. */
 
 		/*
@@ -499,7 +499,7 @@ int Socket::Listen() {
 					{
 						fprintf( stderr,
 							"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
-							pgmName,
+							"Socket",
 							__LINE__,
 							desc[ idx ].revents );
 						return INVALID_SOCKET;
@@ -580,8 +580,7 @@ int Socket::Listen() {
 *    Returns the socket descriptor for the connection, or INVALID_DESC if all
 *    address records have been processed and a socket could not be initialized.
 ******************************************************************************/
-int Socket::openSckt( unsigned int  scopeId)
-{
+int Socket::openClientSckt() {
 	struct addrinfo *ai;
 	struct addrinfo *aiHead;
 	struct addrinfo  hints;
@@ -764,7 +763,7 @@ bool Socket::PrintAddrInfo( struct addrinfo *sadr ){
 			{
 				fprintf( stderr,
 					"%s (line %d): ERROR - Unknown protocol family (%d).\n",
-					pgmName,
+					"Socket",
 					__LINE__,
 					sadr->ai_family );
 				//freeaddrinfo( aiHead );
