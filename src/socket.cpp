@@ -175,8 +175,10 @@ bool Socket::RecvUC(std::string& buffer, int recvbuflen) {
 			SYSCALL("recvfrom", __LINE__,  inBytes );
 		}
 	//} while( inBytes > 0 && recvbuflen > 0 );
-
-	PrintIncomingInfo(sadr,sadrLen); //PrintDebugInfo();
+	{
+		struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
+		PrintAddrInfo(&saddri);
+	}
 	return result;
 }
 
@@ -550,7 +552,10 @@ int Socket::tod( int    tSckt[ ],
                            SHUT_RD ) );
 */ // ********************  NOT REQUIRED ********************
 
-			PrintIncomingInfo(sadr,sadrLen);
+			{
+				struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
+				PrintAddrInfo(&saddri);
+			}
 
             /*
             ** Send the TOD to the client.
@@ -872,15 +877,10 @@ int Socket::openScktUC( const char   *host,
    return sckt;
 }  /* End openSckt() */
 
-      /*
-      ** Display the address info.
-      */
+/*
+** Display the address info.
+*/
 bool Socket::PrintAddrInfo( struct addrinfo *sadr ){
-
-//	struct sockaddr         *sadr;
-//	socklen_t                sadrLen;
-//	sadrLen = sizeof( sockStor );
-//	sadr    = (struct sockaddr*) ai;
 
     if ( verbose )
     {
@@ -982,95 +982,4 @@ bool Socket::PrintAddrInfo( struct addrinfo *sadr ){
 	return true;
 }
 
-      /*
-      ** Display the address info.
-      */
-bool Socket::PrintIncomingInfo( struct sockaddr *sadr , socklen_t sadrLen ){
-	if ( verbose )
-	{
-
-		/*
-		** Temporary character string buffers for host & service.
-		*/
-
-		char hostBfr[ NI_MAXHOST ];
-		char servBfr[ NI_MAXSERV ];
-
-		/*
-		** Display the socket address info of the remote client.   Start with the protocol-
-		** independent fields first.
-		*/
-
-		fprintf( stderr,
-			"Sockaddr info(PrintIncomingInfo):\n"
-			"   sa_family = %d (AF_INET = %d, AF_INET6 = %d)\n"
-			"   addrlen  = %d (sockaddr_in = %lu, sockaddr_in6 = %lu)\n",
-			sadr->sa_family,
-			AF_INET,
-			AF_INET6,
-			sadrLen,
-			sizeof( struct sockaddr_in ),
-			sizeof( struct sockaddr_in6 ) );
-
-		/*
-		** Now display the protocol-specific formatted socket address.  Note
-		** that the program is requesting that getnameinfo(3) convert the
-		** host & service into numeric strings.
-		*/
-		getnameinfo( sadr,
-			sadrLen,
-			hostBfr,
-			sizeof( hostBfr ),
-			servBfr,
-			sizeof( servBfr ),
-			NI_NUMERICHOST | NI_NUMERICSERV );
-
-		/*
-		** Notice that we're switching on an address family now, not a
-		** protocol family.
-		*/
-
-		switch ( sadr->sa_family )
-		{
-			case AF_INET:   /* IPv4 address. */
-			{
-				struct sockaddr_in *pSadrIn = (struct sockaddr_in*) sadr;
-				fprintf( stderr,
-					"   sin_addr  = sin_family: %d\n"
-					"               sin_addr:   %s\n"
-					"               sin_port:   %s\n",
-					pSadrIn->sin_family,
-					hostBfr,
-					servBfr );
-				break;
-			}  /* End CASE of IPv4 address. */
-			case AF_INET6:   /* IPv6 address. */
-			{
-				struct sockaddr_in6 *pSadrIn6 = (struct sockaddr_in6*) sadr;
-				fprintf( stderr,
-					"   sin6_addr = sin6_family:   %d\n"
-					"               sin6_addr:     %s\n"
-					"               sin6_port:     %s\n"
-					"               sin6_flowinfo: %d\n"
-					"               sin6_scope_id: %d\n",
-					pSadrIn6->sin6_family,
-					hostBfr,
-					servBfr,
-					pSadrIn6->sin6_flowinfo,
-					pSadrIn6->sin6_scope_id );
-				break;
-			}  /* End CASE of IPv6 address. */
-			default:   /* Can never get here, but just for completeness. */
-			{
-				fprintf( stderr,
-					"%s (line %d): ERROR - Unknown address family (%d).\n",
-					pgmName,
-					__LINE__,
-					sadr->sa_family );
-				return false;
-			}  /* End DEFAULT case (unknown address family). */
-		}  /* End SWITCH on address family. */
-	}  /* End IF verbose mode. */
-	return true;
-}
 

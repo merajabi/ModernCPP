@@ -105,6 +105,52 @@ typedef struct sockaddr_in6      sockaddr_in6_t;
 **             // care of dumping an error alert to stderr.
 **          }
 */
+
+/*
+typedef uint16_t in_port_t;         
+typedef uint32_t in_addr_t;         
+ 
+struct in_addr {
+     in_addr_t s_addr;           
+ };
+ 
+ struct in6_addr {
+     uint8_t s6_addr[16];        
+ };
+ 
+ struct sockaddr_in {
+     sa_family_t     sin_family; //    short            sin_family;   // e.g. AF_INET
+     in_port_t       sin_port;   //    unsigned short   sin_port;     // e.g. htons(3490)
+     struct in_addr  sin_addr;   //    struct in_addr   sin_addr;     // see struct in_addr, below
+ };								//    char             sin_zero[8];  // zero this if you want to
+
+ struct sockaddr_in6 {
+     sa_family_t     sin6_family;    
+     in_port_t       sin6_port;      
+     uint32_t        sin6_flowinfo;  
+     struct in6_addr sin6_addr;      
+     uint32_t        sin6_scope_id;  
+ };
+
+struct sockaddr {
+    unsigned short    sa_family;    // address family, AF_xxx
+    char              sa_data[14];  // 14 bytes of protocol address
+}; 
+
+struct addrinfo {
+    int              ai_flags;     // AI_PASSIVE, AI_CANONNAME, etc.
+    int              ai_family;    // AF_INET, AF_INET6, AF_UNSPEC
+    int              ai_socktype;  // SOCK_STREAM, SOCK_DGRAM
+    int              ai_protocol;  // use 0 for "any"
+    size_t           ai_addrlen;   // size of ai_addr in bytes
+    struct sockaddr *ai_addr;      // struct sockaddr_in or _in6
+    char            *ai_canonname; // full canonical hostname
+
+    struct addrinfo *ai_next;      // linked list, next node
+};
+
+*/
+
 class Socket;
 static __inline boolean SYSCALL( const char *syscallName, int lineNbr, int status );
 /*
@@ -168,11 +214,8 @@ class Socket {
 		bool RecvTC(std::string& buffer, int recvbuflen);
 
 		bool SetTimeout(unsigned long tout);
-		//bool PrintDebugInfo();
 		bool PrintAddrInfo( struct addrinfo *ai );
-		bool PrintIncomingInfo( struct sockaddr *sadr , socklen_t sadrLen);
-		//bool PrintRemoteInfo( struct addrinfo *ai );
-
+		bool PrintIncomingInfo( struct addrinfo *sadri );
 		bool Close();
 
 	   /*
