@@ -17,8 +17,8 @@ void Handel(std::unique_ptr<Socket> sp){
 	std::string str="Hi Client";
 	std::cout << str.size() << std::endl;
 	sp->SendTCP(str);
-	sleep(5);
-	//sp->Close();
+	//sleep(5);
+	sp->Close();
 }
 
 int main(int argc, char **argv) {
@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 				std::unique_ptr<Socket> sp(new Socket(s.Accept()));
 				if(*sp){
 					std::thread t( Handel,std::move(sp) );
-					t.detach();
+					t.detach(); //join detach
 				}else{
 					s.SetTimeout(2*1000);
 					std::cout << "\n No thread: "<<i<< std::endl;
@@ -66,6 +66,7 @@ int main(int argc, char **argv) {
 			};
 			sleep(5);
 		}
+		s.Close();
 	}
 	return 0;
 };

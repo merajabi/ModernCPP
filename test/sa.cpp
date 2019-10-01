@@ -11,16 +11,16 @@
 int i=0;
 void Handel(std::unique_ptr<Socket> sp){
 	sp->SetTimeout(2*1000);
-	std::cout << "\n thread: "<<i<< std::endl;
+	std::cerr << "\n thread: "<<i<< std::endl;
 	std::string res;
 	sp->RecvTCP(res,959); //959
-	std::cout << res.size() << std::endl;
+	std::cerr << res.size() << std::endl;
 
 	std::string str="Hi Client";
-	std::cout << str.size() << std::endl;
+	std::cerr << str.size() << std::endl;
 	sp->SendTCP(str);
-	sleep(5);
-	//sp->Close();
+	sp->Close();
+	//sleep(5);
 }
 
 int main(int argc, char **argv) {
@@ -47,7 +47,8 @@ int main(int argc, char **argv) {
 		s4.OpenServer();
 		pool.Add(s4);
 
-		if(pool.Listen(selected)){
+		while(pool.Listen(selected)){
+			std::cerr << "New network activity.\n" << std::endl;
 			for(i=0; i < selected.size(); i++ ){
 				Socket s = selected[i];
 				std::unique_ptr<Socket> sp( new Socket(s.AcceptIncomming()) );
@@ -56,18 +57,22 @@ int main(int argc, char **argv) {
 					t.detach();
 				}else{
 					s.SetTimeout(2*1000);
-					std::cout << "\n No thread: "<<i<< std::endl;
+					std::cerr << "\n No thread: "<<i<< std::endl;
 					std::string res;
 					s.RecvUDP(res,959); //959
-					std::cout << res.size() << std::endl;
+					std::cerr << res.size() << std::endl;
 
 					std::string str="Hi Client";
-					std::cout << str.size() << std::endl;
+					std::cerr << str.size() << std::endl;
 					s.SendUDP(str);
 					//break;
 				}			
 			};
 		}
+		s1.Close();
+		s2.Close();
+		s3.Close();
+		s4.Close();
 		sleep(5);
 	}
 	return 0;

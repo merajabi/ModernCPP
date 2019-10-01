@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
 
 		std::string res;
 		c.RecvTCP(res,9); //9
-		//c.Close();
+		c.Close();
 		std::cout << res.size() << std::endl;
 	}
 	return 0;

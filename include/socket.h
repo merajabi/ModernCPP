@@ -203,6 +203,8 @@ class Socket {
 
 		int Accept();
 		int AcceptIncomming();
+
+		int GetFD(){return sock;}
 		operator bool () {return ( sock >= 0 );}
 
 		friend class Select;

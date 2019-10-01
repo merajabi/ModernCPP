@@ -38,7 +38,7 @@ Socket::Socket(const std::string& pH, const std::string& pP, const std::string& 
 
 Socket::~Socket(){ 
 	fprintf(stderr, "~Socket called.\n");
-	Close();
+//	Close();
 	Finalize();
 }
 
