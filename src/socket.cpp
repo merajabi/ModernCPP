@@ -22,16 +22,10 @@ boolean SYSCALL( const char *syscallName, int lineNbr, int status ) {
 
 Socket::Socket(const int& s):sock(s),timeout(0){
 	Initialize();
-//	tScktSize = 0;
-//	uScktSize = 0;
-	cSckt=INVALID_SOCKET;
 }
 
-Socket::Socket(const std::string& pH, const std::string& pP, const std::string& proto, unsigned long tout): sock(INVALID_SOCKET),host(pH),service(pP),protocol(proto),scope(DFLT_SCOPE_ID),timeout(tout) {
+Socket::Socket(const std::string& pH, const std::string& pP, const std::string& proto, const std::string& family, unsigned long tout): sock(INVALID_SOCKET),host(pH),service(pP),protocol(proto),family(family),scope(DFLT_SCOPE_ID),timeout(tout) {
 	Initialize();
-//	tScktSize = 0;
-//	uScktSize = 0;
-	cSckt=INVALID_SOCKET;
 /*
 	if(host.size()!=0){
 		Open();
@@ -45,29 +39,16 @@ Socket::Socket(const std::string& pH, const std::string& pP, const std::string& 
 Socket::~Socket(){ 
 	fprintf(stderr, "~Socket called.\n");
 	Close();
-	for(int i=0;i<tSckt.size();i++){
-		fprintf(stderr, "Close called on socket id: %d \n",tSckt[i]);
-		SYSCALL( "close",
-                   __LINE__,
-                   close( tSckt[i] ) );
-	}
-	for(int i=0;i<uSckt.size();i++){
-		fprintf(stderr, "Close called on socket id: %d \n",uSckt[i]);
-		SYSCALL( "close",
-                   __LINE__,
-                   close( uSckt[i] ) );
-	}
 	Finalize();
 }
 
 bool Socket::Close(){
 	bool result = false;
-	if( cSckt >=0 ){
-		if( SYSCALL( "close", __LINE__, close( cSckt ) ) ) {
+	if( sock >=0 ){
+		if( SYSCALL( "close", __LINE__, close( sock ) ) ) {
 			result=true;
 		}
 	}
-	cSckt=INVALID_SOCKET;
 	sock=INVALID_SOCKET;
 	return result;
 }
@@ -212,14 +193,15 @@ bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
 ** sockets).
 */
 bool Socket::OpenClient(){
-	cSckt = openClientSckt( );
+	return  openClientSckt( );
+}
 
-	if ( !SYSCALL( "OpenClient", __LINE__, cSckt )  ) {
-		return false;
-	}
-	sock = cSckt;
-	return true;
+bool Socket::OpenServer(){
+	return openServerSckt( ) ; //openServerSckt( "tcp"  ) && openServerSckt( "udp" )
+}
 
+int Socket::Accept(){
+	return Listen( ); 
 }
 
 
@@ -249,11 +231,40 @@ bool Socket::OpenClient(){
 * Return Value:
 *    0 on success, -1 on error.
 ******************************************************************************/
-int Socket::openServerSckt( const std::string& service, const std::string& protocol ) {
+bool Socket::openServerSckt( ) {
    struct addrinfo *ai;
    struct addrinfo *aiHead;
-   struct addrinfo  hints    = { .ai_flags  = AI_PASSIVE,    /* Server mode. */
-                                 .ai_family = PF_UNSPEC };   /* IPv4 or IPv6. */
+   struct addrinfo  hints    = { .ai_flags  = AI_PASSIVE };   // Server mode.
+//                                 .ai_family = PF_UNSPEC };   // IPv4 or IPv6.
+
+	if( sock != INVALID_SOCKET ) { // Socket already open
+         fprintf( stderr,
+                  "%s (line %d): ERROR - Socket: %d already open ",
+                  "Socket",
+                  __LINE__,
+                  sock );
+
+		return false;
+	}
+
+   /*
+   ** Check which network family is selected (only ipv4 and ipv6 are valid).
+   */
+	if ( family == "ipv4" ){ 
+		hints.ai_family = PF_INET;
+	}
+	else if( family == "ipv6" ){
+		hints.ai_family = PF_INET6;
+	}
+	else {
+      fprintf( stderr,
+               "%s (line %d): ERROR - Unknown family "
+               "network family \"%s\".\n",
+               "Socket",
+               __LINE__,
+               family.c_str() );
+      return false;
+	}
 
    /*
    ** Check which protocol is selected (only TCP and UDP are valid).
@@ -271,7 +282,7 @@ int Socket::openServerSckt( const std::string& service, const std::string& proto
    else                                         /* Invalid protocol. */
    {
       fprintf( stderr,
-               "%s (line %d): ERROR - Unknown transport "
+               "%s (line %d): ERROR - Unknown protocol "
                "layer protocol \"%s\".\n",
                "Socket",
                __LINE__,
@@ -380,12 +391,8 @@ int Socket::openServerSckt( const std::string& service, const std::string& proto
       /*
       ** Socket set up okay.  Bump index to next descriptor array element.
       */
-		if ( protocol == "tcp" ) {      /* TCP protocol.     */
-			tSckt.push_back(sg.release());
-		}
-		else if ( protocol == "udp" ) {  /* UDP protocol.     */
-			uSckt.push_back(sg.release());
-		}
+
+		sock = sg.release();
    }  /* End FOR each address info structure returned. */
    /*
    ** Clean up.
@@ -412,48 +419,23 @@ int Socket::openServerSckt( const std::string& service, const std::string& proto
 ******************************************************************************/
 int Socket::Listen() {
 	std::vector<struct pollfd> desc;
-	//size_t                   descSize = tSckt.size() + uSckt.size();
 	int                      newSckt;
+	
+	if( sock < 0 ) { // Socket not open
+         fprintf( stderr,
+                  "%s (line %d): ERROR - Socket: Socket not open ",
+                  "Socket",
+                  __LINE__);
 
-	sock = INVALID_SOCKET;
-
-	/*
-	** Allocate memory for the poll(2) array.
-	*/
-	/*
-	desc = (pollfd*)malloc( descSize * sizeof( struct pollfd ) );
-	if ( desc == NULL )	{
-		fprintf( stderr,
-			"%s (line %d): ERROR - %s.\n",
-			"Socket",
-			__LINE__,
-			strerror( ENOMEM ) );
 		return INVALID_SOCKET;
 	}
-	*/
 
 	/*
 	** Initialize the poll(2) array.
 	*/
-	/*
-	for ( idx = 0;     idx < descSize;     idx++ ) {
-		desc[ idx ].fd      = idx < tScktSize  ?  tSckt[ idx ]
-				   								  :  uSckt[ idx - tScktSize ];
-		desc[ idx ].events  = POLLIN;
-		desc[ idx ].revents = 0;
-	}
-	*/
-
-	for ( int idx = 0;     idx < tSckt.size();     idx++ ) {
+	{
 		struct pollfd pfd;
-		pfd.fd      = tSckt[ idx ];
-		pfd.events  = POLLIN;
-		pfd.revents = 0;
-		desc.push_back(pfd);
-	}
-	for ( int idx = 0;     idx < uSckt.size();     idx++ ) {
-		struct pollfd pfd;
-		pfd.fd      = uSckt[ idx ];
+		pfd.fd      = sock;
 		pfd.events  = POLLIN;
 		pfd.revents = 0;
 		desc.push_back(pfd);
@@ -472,7 +454,7 @@ int Socket::Listen() {
 		*/
 		int status;
 		do {
-			status = poll( &desc[0], tSckt.size() + uSckt.size(), -1 ); /* Wait indefinitely for input. */
+			status = poll( &desc[0], desc.size(), -1 ); /* Wait indefinitely for input. */
 		} while ( ( status < 0 ) && ( errno == EINTR ) );
 
 		if(!SYSCALL("poll", __LINE__,  status )){   /* Check for a bona fide system call error. */
@@ -489,12 +471,15 @@ int Socket::Listen() {
 		/*
 		** Process sockets with input available.
 		*/
-		for ( int idx = 0;     idx < tSckt.size() + uSckt.size();     idx++ ) {
+		int idx = 0;
 			switch ( desc[ idx ].revents ) {
 				case 0:        /* No activity on this socket; try the next. */
-					continue;
-				case POLLIN:   /* Network activity.  Go process it.         */
 					break;
+				case POLLIN:   /* Network activity.  Go process it.         */
+					desc[ idx ].revents = 0;   /* Clear the returned poll events. */
+					return AcceptIncomming(); //desc[ idx ].fd
+					break;
+
 				default:       /* Invalid poll events.                      */
 					{
 						fprintf( stderr,
@@ -505,55 +490,43 @@ int Socket::Listen() {
 						return INVALID_SOCKET;
 					}
 			}  /* End SWITCH on returned poll events. */
-			/*
-			** Determine if this is a TCP request or UDP request.
-			*/
-			if ( idx < tSckt.size() ) {
-				/*
-				** TCP connection requested.  Accept it.  Notice the use of
-				** the sockaddr_storage data type.
-				*/
-				struct sockaddr_storage  sockStor;
-				struct sockaddr         *sadr = (struct sockaddr*) &sockStor;
-				socklen_t                sadrLen = sizeof( sockStor );
-
-				socket_guard newSG( accept( desc[ idx ].fd, sadr, &sadrLen ) );
-
-				if(!SYSCALL("accept", __LINE__, newSG.get() ) ) {
-					return INVALID_SOCKET;
-				}
-				/*	********************  NOT REQUIRED ********************
-				SYSCALL("shutdown", __LINE__,  shutdown( newSckt, SHUT_RD ) );      // Server never recv's anything.
-				
-				*/ // ********************  NOT REQUIRED ********************
-
-				{
-					struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
-					PrintAddrInfo(&saddri);
-				}
-
-
-				/*	********************  NOT REQUIRED ********************
-				SYSCALL("close", __LINE__,  close( newSckt ) );
-				*/ // ********************  NOT REQUIRED ********************
-
-				desc[ idx ].revents = 0;   /* Clear the returned poll events. */
-				return newSG.release();
-
-			}  /* End IF this was a TCP connection request. */
-			//	********************  Added for Socket Class ********************
-			else {
-				desc[ idx ].revents = 0;   /* Clear the returned poll events. */
-				sock = desc[ idx ].fd;
-				return INVALID_SOCKET;
-
-			}/* End ELSE a UDP datagram is available. */
-			//	********************  Added for Socket Class ********************
-
-		}  /* End FOR each socket descriptor. */
 	}  /* End WHILE forever. */
 }  /* End tod() */
 
+int Socket::AcceptIncomming () {
+	/*
+	** Determine if this is a TCP request or UDP request.
+	*/
+	if ( protocol == "tcp") {
+		/*
+		** TCP connection requested.  Accept it.  Notice the use of
+		** the sockaddr_storage data type.
+		*/
+		struct sockaddr_storage  sockStor;
+		struct sockaddr         *sadr = (struct sockaddr*) &sockStor;
+		socklen_t                sadrLen = sizeof( sockStor );
+
+		socket_guard newSG( accept( sock, sadr, &sadrLen ) );
+
+		if(!SYSCALL("accept", __LINE__, newSG.get() ) ) {
+			return INVALID_SOCKET;
+		}
+
+		{
+			struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
+			PrintAddrInfo(&saddri);
+		}
+
+		return newSG.release();
+
+	}  /* End IF this was a TCP connection request. */
+	//	********************  Added for Socket Class ********************
+	else {
+		return INVALID_SOCKET;
+
+	}/* End ELSE a UDP datagram is available. */
+	//	********************  Added for Socket Class ********************
+}
 /******************************************************************************
 * Function: openSckt
 *
@@ -580,10 +553,20 @@ int Socket::Listen() {
 *    Returns the socket descriptor for the connection, or INVALID_DESC if all
 *    address records have been processed and a socket could not be initialized.
 ******************************************************************************/
-int Socket::openClientSckt() {
+bool Socket::openClientSckt() {
 	struct addrinfo *ai;
 	struct addrinfo *aiHead;
 	struct addrinfo  hints;
+
+	if( sock != INVALID_SOCKET ) { // Socket already open
+         fprintf( stderr,
+                  "%s (line %d): ERROR - Socket: %d already open ",
+                  "Socket",
+                  __LINE__,
+                  sock );
+
+		return false;
+	}
 
 	/*
 	** Initialize the 'hints' structure for getaddrinfo(3).
@@ -609,7 +592,7 @@ int Socket::openClientSckt() {
 		hints.ai_protocol = IPPROTO_UDP;   /* UDP transport layer protocol only. */
 	}
 	else{
-		return INVALID_DESC;
+		return false;
 	}
 
 	/*
@@ -617,7 +600,7 @@ int Socket::openClientSckt() {
 	*/
 	int aiErr = getaddrinfo( host.c_str(), service.c_str(), &hints, &aiHead );
 	if ( !SYSCALL("getaddrinfo", __LINE__, aiErr ) ) { //gai_strerror( aiErr )
-		return INVALID_DESC;
+		return false;
 	}
 
 	/*
@@ -642,7 +625,6 @@ int Socket::openClientSckt() {
 		*/
 		socket_guard sg( socket( ai->ai_family, ai->ai_socktype, ai->ai_protocol ) );
 		if ( !SYSCALL( "socket", __LINE__, sg.get() ) ) {
-			//sckt = INVALID_DESC;
 			continue;   /* Try the next address record in the list. */
 		}
 
@@ -654,11 +636,9 @@ int Socket::openClientSckt() {
 						__LINE__,
 						connect( sg.get(), ai->ai_addr, ai->ai_addrlen ) ) )
 		{
-			//(void) close( sckt );   /* Could use SYSCALL() again here, but why? */
-			//sckt = INVALID_DESC;
-			//continue;   /* Try the next address record in the list. */
 			freeaddrinfo( aiHead );
-			return sg.release();
+			sock = sg.release();
+			return true;
 		}
 	}  /* End FOR each address record returned by getaddrinfo(3). */
 
@@ -666,7 +646,7 @@ int Socket::openClientSckt() {
 	** Clean up & return.
 	*/
 	freeaddrinfo( aiHead );
-	return INVALID_DESC;
+	return false;
 }  /* End openSckt() */
 
 /*

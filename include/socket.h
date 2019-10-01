@@ -67,16 +67,17 @@ struct addrinfo {
 /*
 ** Constants & macros.
 */
-#define DFLT_HOST			"localhost" /* Default server name.              */
-#define DFLT_SCOPE_ID		"eth0"      /* Default scope identifier.         */
-#define DFLT_SERVICE		"daytime"   /* Default service name.             */
+#define DFLT_HOST			"localhost" // Default server name.
+#define DFLT_SERVICE		"daytime"   // Default service name or port.
+#define DFLT_PROTOCOL		"tcp"  		// tcp, udp
+#define DFLT_FAMILY			"ipv6"   	// AF_INET, AF_INET6, AF_UNSPEC
+#define DFLT_SCOPE_ID		"eth0"      // Default scope identifier.
+
 #define INVALID_DESC		-1          /* Invalid file descriptor.          */
 #define INVALID_SOCKET		-1
 #define MAXBFRSIZE			256         /* Max bfr sz to read remote TOD.    */
 #define DEFAULT_BUFLEN		256
 #define MAXCONNQLEN			3           /* Max nbr of connection requests to queue. */
-//#define MAXTCPSCKTS			2           /* One TCP socket for IPv4 & one for IPv6.  */
-//#define MAXUDPSCKTS			2           /* One UDP socket for IPv4 & one for IPv6.  */
 #define VALIDOPTS			"v"         /* Valid command options.                   */
 //#define VALIDOPTS			"s:v"       /* Valid command options.            */
 
@@ -127,7 +128,8 @@ typedef struct sockaddr_in6      sockaddr_in6_t;
 **          }
 */
 
-static __inline boolean SYSCALL( const char *syscallName, int lineNbr, int status );
+//static __inline boolean SYSCALL( const char *syscallName, int lineNbr, int status );
+boolean SYSCALL( const char *syscallName, int lineNbr, int status );
 
 class socket_guard {
 	int sock;
@@ -150,25 +152,31 @@ class socket_guard {
 		}
 };
 
+class Select;
+
 class Socket {
 		static std::atomic<unsigned long> sockCount;
 
 		std::string				host;
 		std::string				service; // service OR port / DFLT_SERVICE
 		std::string				protocol;
+		std::string				family;
 		std::string				scope;
 		unsigned long timeout;
 
 		int 					sock;	// Active Socket
-		int         			cSckt;	// Client Socket
-		std::vector<int>        tSckt;	// Array of TCP socket descriptors. MAXTCPSCKTS
-		std::vector<int>        uSckt;	// Array of UDP socket descriptors. MAXUDPSCKTS
+//		int         			cSckt;	// Client Socket
+//		std::vector<int>        tSckt;	// Array of TCP socket descriptors. MAXTCPSCKTS
+//		std::vector<int>        uSckt;	// Array of UDP socket descriptors. MAXUDPSCKTS
 
 		struct sockaddr_storage  udpSockStor;
 
-		int openServerSckt( const std::string& service, const std::string& protocol );
-		int openClientSckt( );
+		bool openServerSckt( );
+		bool openClientSckt( );
 		int Listen( );
+
+		bool PrintAddrInfo( struct addrinfo *ai );
+		//bool PrintIncomingInfo( struct addrinfo *sadri );
 
 	public:
 		/*
@@ -178,7 +186,7 @@ class Socket {
 
 	public:
 		Socket(const int& s);
-		Socket(const std::string& pH=DFLT_HOST, const std::string& pP=DFLT_SERVICE, const std::string& proto="tcp", unsigned long tout=0);
+		Socket(const std::string& pH=DFLT_HOST, const std::string& pP=DFLT_SERVICE, const std::string& proto=DFLT_PROTOCOL,const std::string& family=DFLT_FAMILY, unsigned long tout=0);
 		~Socket();
 
 		bool SendUDP(const std::string& buffer);
@@ -188,21 +196,16 @@ class Socket {
 		bool RecvTCP(std::string& buffer, int recvbuflen);
 
 		bool SetTimeout(unsigned long tout);
-		bool PrintAddrInfo( struct addrinfo *ai );
-		bool PrintIncomingInfo( struct addrinfo *sadri );
 		bool Close();
 
 		bool OpenClient();
+		bool OpenServer();
 
-		bool OpenServer(const std::string& service, const std::string& protocol){
-			return ( openServerSckt( service, protocol ) ); //openServerSckt( "tcp"  ) && openServerSckt( "udp" )
-		}
-		int Accept(){
-			if ( ( tSckt.size() > 0 ) || ( uSckt.size() > 0 ) ) {         
-				return Listen( ); /* tod() never returns. */
-			}
-		}
+		int Accept();
+		int AcceptIncomming();
 		operator bool () {return ( sock >= 0 );}
+
+		friend class Select;
 
 	private:
 		static bool Initialize(){
@@ -228,3 +231,4 @@ class Socket {
 };
 
 #endif //_WIN_SOCKET_H_
+

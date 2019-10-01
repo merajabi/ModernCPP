@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "socket.h"
+#include "select.h"
+
 int i=0;
 void Handel(std::unique_ptr<Socket> sp){
 	sp->SetTimeout(2*1000);
@@ -22,31 +24,33 @@ void Handel(std::unique_ptr<Socket> sp){
 }
 
 int main(int argc, char **argv) {
-	std::string hostName="localhost";
-	std::string hostPort="8080";
-	std::string hostProtocol="tcp";
-	std::string hostFamily="ipv4";
-
-    printf("usage: %s [port [protocol [family] ] ] ]   \n", argv[0]);
-
-	if( argc > 1 ){
-		hostPort = argv[1];
-	}
-	if( argc > 2 ){
-		hostProtocol = argv[2];
-	}
-	if( argc > 3 ){
-		hostFamily = argv[3];
-	}
 
 	Socket::verbose = true;
 
 	{
-		Socket s(DFLT_HOST,hostPort,hostProtocol,hostFamily);
+		Select pool;
+		std::vector<Socket> selected;
 
-		if(s.OpenServer()){
-			while(i<1){
-				std::unique_ptr<Socket> sp(new Socket(s.Accept()));
+		Socket s1(DFLT_HOST,"8080","tcp","ipv4");
+		s1.OpenServer();
+		pool.Add(s1);
+
+		Socket s2(DFLT_HOST,"8080","tcp","ipv6");
+		s2.OpenServer();
+		pool.Add(s2);
+
+		Socket s3(DFLT_HOST,"8080","udp","ipv4");
+		s3.OpenServer();
+		pool.Add(s3);
+
+		Socket s4(DFLT_HOST,"8080","udp","ipv6");
+		s4.OpenServer();
+		pool.Add(s4);
+
+		if(pool.Listen(selected)){
+			for(i=0; i < selected.size(); i++ ){
+				Socket s = selected[i];
+				std::unique_ptr<Socket> sp( new Socket(s.AcceptIncomming()) );
 				if(*sp){
 					std::thread t( Handel,std::move(sp) );
 					t.detach();
@@ -62,10 +66,9 @@ int main(int argc, char **argv) {
 					s.SendUDP(str);
 					//break;
 				}			
-				i++;
 			};
-			sleep(5);
 		}
+		sleep(5);
 	}
 	return 0;
 };
