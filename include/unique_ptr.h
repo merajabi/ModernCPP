@@ -86,6 +86,12 @@ namespace ModernCPP {
 		typedef Matrix<N, 1> type;
 	};
 */
+/*
+	template<typename T>
+	T& move (T& p){
+		return p.move();
+	}
+*/
 	template<typename T>
 	T* move (unique_ptr<T>& p){
 		return p.move();

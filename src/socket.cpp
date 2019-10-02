@@ -192,17 +192,6 @@ bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
 ** opened (connect(2) fails without the scope ID properly set for IPv6
 ** sockets).
 */
-bool Socket::OpenClient(){
-	return  openClientSckt( );
-}
-
-bool Socket::OpenServer(){
-	return openServerSckt( ) ; //openServerSckt( "tcp"  ) && openServerSckt( "udp" )
-}
-
-int Socket::Accept(){
-	return Listen( ); 
-}
 
 
 /******************************************************************************
@@ -231,7 +220,7 @@ int Socket::Accept(){
 * Return Value:
 *    0 on success, -1 on error.
 ******************************************************************************/
-bool Socket::openServerSckt( ) {
+bool Socket::OpenServer( ) {
    struct addrinfo *ai;
    struct addrinfo *aiHead;
    struct addrinfo  hints    = { .ai_flags  = AI_PASSIVE };   // Server mode.
@@ -477,7 +466,7 @@ int Socket::Listen() {
 					break;
 				case POLLIN:   /* Network activity.  Go process it.         */
 					desc[ idx ].revents = 0;   /* Clear the returned poll events. */
-					return AcceptIncomming(); //desc[ idx ].fd
+					return Accept(); //desc[ idx ].fd
 					break;
 
 				default:       /* Invalid poll events.                      */
@@ -493,7 +482,7 @@ int Socket::Listen() {
 	}  /* End WHILE forever. */
 }  /* End tod() */
 
-int Socket::AcceptIncomming () {
+int Socket::Accept () {
 	/*
 	** Determine if this is a TCP request or UDP request.
 	*/
@@ -553,7 +542,7 @@ int Socket::AcceptIncomming () {
 *    Returns the socket descriptor for the connection, or INVALID_DESC if all
 *    address records have been processed and a socket could not be initialized.
 ******************************************************************************/
-bool Socket::openClientSckt() {
+bool Socket::OpenClient() {
 	struct addrinfo *ai;
 	struct addrinfo *aiHead;
 	struct addrinfo  hints;

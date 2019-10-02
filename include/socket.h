@@ -131,27 +131,6 @@ typedef struct sockaddr_in6      sockaddr_in6_t;
 //static __inline boolean SYSCALL( const char *syscallName, int lineNbr, int status );
 boolean SYSCALL( const char *syscallName, int lineNbr, int status );
 
-class socket_guard {
-	int sock;
-	public:
-		socket_guard(int sock=INVALID_SOCKET):sock(sock){
-		};
-		~socket_guard(){
-			if( sock != INVALID_SOCKET ) {
-				SYSCALL( "close", __LINE__, close( sock ));
-				sock = INVALID_SOCKET;
-			}
-		}
-		int get(){
-			return sock;
-		}
-		int release(){
-			int tmp=sock;
-			sock = INVALID_SOCKET;
-			return tmp;
-		}
-};
-
 class Select;
 
 class Socket {
@@ -162,22 +141,23 @@ class Socket {
 		std::string				protocol;
 		std::string				family;
 		std::string				scope;
+		bool					listening;
 		unsigned long timeout;
 
 		int 					sock;	// Active Socket
-//		int         			cSckt;	// Client Socket
-//		std::vector<int>        tSckt;	// Array of TCP socket descriptors. MAXTCPSCKTS
-//		std::vector<int>        uSckt;	// Array of UDP socket descriptors. MAXUDPSCKTS
 
 		struct sockaddr_storage  udpSockStor;
+	public:
+		bool OpenClient();
+		bool OpenServer();
 
-		bool openServerSckt( );
-		bool openClientSckt( );
-		int Listen( );
+		bool SendUDP(const std::string& buffer);
+		bool SendTCP(const std::string& buffer);
+
+		bool RecvUDP(std::string& buffer, int recvbuflen);
+		bool RecvTCP(std::string& buffer, int recvbuflen);
 
 		bool PrintAddrInfo( struct addrinfo *ai );
-		//bool PrintIncomingInfo( struct addrinfo *sadri );
-
 	public:
 		/*
 		** Global (within this file only) data objects.
@@ -189,23 +169,25 @@ class Socket {
 		Socket(const std::string& pH=DFLT_HOST, const std::string& pP=DFLT_SERVICE, const std::string& proto=DFLT_PROTOCOL,const std::string& family=DFLT_FAMILY, unsigned long tout=0);
 		~Socket();
 
-		bool SendUDP(const std::string& buffer);
-		bool SendTCP(const std::string& buffer);
-
-		bool RecvUDP(std::string& buffer, int recvbuflen);
-		bool RecvTCP(std::string& buffer, int recvbuflen);
 
 		bool SetTimeout(unsigned long tout);
 		bool Close();
+		bool Open(){
+			return (listening)?OpenServer():OpenClient();
+		}
 
-		bool OpenClient();
-		bool OpenServer();
+		bool Send(const std::string& buffer){
+			return (protocol=="tcp")?SendTCP(buffer):SendUDP(buffer);
+		}
+		bool Recv(std::string& buffer, int recvbuflen){
+			return (protocol=="tcp")?RecvTCP(buffer,recvbuflen):RecvUDP(buffer,recvbuflen);
+		}
 
+		int Listen();
 		int Accept();
-		int AcceptIncomming();
 
-		int GetFD(){return sock;}
-		operator bool () {return ( sock >= 0 );}
+		int GetFD() const {return sock;}
+		operator bool () const {return ( sock >= 0 );}
 
 		friend class Select;
 
@@ -231,6 +213,30 @@ class Socket {
 		}
 
 };
+
+class socket_guard {
+	int sock;
+	public:
+		socket_guard(int sock=INVALID_SOCKET):sock(sock){
+		};
+		socket_guard(const Socket& s):sock(s.GetFD()){
+		};
+		~socket_guard(){
+			if( sock != INVALID_SOCKET ) {
+				SYSCALL( "close", __LINE__, close( sock ));
+				sock = INVALID_SOCKET;
+			}
+		}
+		int get(){
+			return sock;
+		}
+		int release(){
+			int tmp=sock;
+			sock = INVALID_SOCKET;
+			return tmp;
+		}
+};
+
 
 #endif //_WIN_SOCKET_H_
 

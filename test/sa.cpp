@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
 			std::cerr << "New network activity.\n" << std::endl;
 			for(i=0; i < selected.size(); i++ ){
 				Socket s = selected[i];
-				std::unique_ptr<Socket> sp( new Socket(s.AcceptIncomming()) );
+				std::unique_ptr<Socket> sp( new Socket(s.Accept()) );
 				if(*sp){
 					std::thread t( Handel,std::move(sp) );
 					t.detach();

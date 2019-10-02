@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
 
 		if(s.OpenServer()){
 			while(i<1){
-				std::unique_ptr<Socket> sp(new Socket(s.Accept()));
+				std::unique_ptr<Socket> sp(new Socket(s.Listen()));
 				if(*sp){
 					std::thread t( Handel,std::move(sp) );
 					t.detach(); //join detach
