@@ -87,36 +87,6 @@ bool Socket::SendTCP(const std::string& buffer){
 	return true;
 }
 
-bool Socket::SendUDP(const std::string& buffer){
-	fprintf(stderr, "SendUDP called.\n");
-	if( !SYSCALL("SendTC", __LINE__,  sock )){
-		return false;
-	}
-	struct sockaddr         *sadr;
-	socklen_t                sadrLen;
-
-	sadrLen = sizeof( udpSockStor );
-	sadr    = (struct sockaddr*) &udpSockStor;
-
-    ssize_t wBytes = buffer.size();
-	ssize_t count;
-	while ( wBytes > 0 ) {
-		do {
-			count = sendto( sock,
-						  buffer.c_str(),
-						  wBytes,
-						  0,
-						  sadr,        /* Address & address length   */
-						  sadrLen );   /*    received in recvfrom(). */
-		} while ( ( count < 0 ) && ( errno == EINTR ) );
-		if(!SYSCALL("write", __LINE__,  count )) {   /* Check for a bona fide error. */
-			return false;
-		}
-		wBytes -= count;
-	}  /* End WHILE there is data to send. */
-
-}
-
 // Receive until the peer closes the connection or read recvbuflen bytes
 bool Socket::RecvTCP(std::string& buffer, int recvbuflen){
 	fprintf(stderr, "RecvTCP called.\n");
@@ -149,20 +119,66 @@ bool Socket::RecvTCP(std::string& buffer, int recvbuflen){
 ** is irrelevant.  Read in the datagram.  Again note the use of
 ** sockaddr_storage to receive the address.
 */
+
+bool Socket::SendUDP(const std::string& buffer){
+	fprintf(stderr, "SendUDP called.\n");
+	if( !SYSCALL("SendTC", __LINE__,  sock )){
+		return false;
+	}
+
+	struct sockaddr         *sadr;
+	socklen_t                sadrLen;
+	if(listening){
+		sadrLen = sizeof( udpSockStor );
+		sadr    = (struct sockaddr*) &udpSockStor;
+	}
+	else{
+		sadrLen = 0;
+		sadr    = NULL;
+	}
+
+    ssize_t wBytes = buffer.size();
+	ssize_t count;
+	while ( wBytes > 0 ) {
+		do {
+			count = sendto( sock,
+						  buffer.c_str(),
+						  wBytes,
+						  0,
+						  sadr,        /* Address & address length   */
+						  sadrLen );   /*    received in recvfrom(). */
+		} while ( ( count < 0 ) && ( errno == EINTR ) );
+		if(!SYSCALL("write", __LINE__,  count )) {   /* Check for a bona fide error. */
+			return false;
+		}
+		wBytes -= count;
+	}  /* End WHILE there is data to send. */
+	return true;
+}
+
 bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
 	fprintf(stderr, "RecvUDP called.\n");
 	if( !SYSCALL("RecvUC", __LINE__,  sock )){
 		return false;
 	}
 	bool result = false;
-	memset (&udpSockStor,0,sizeof(udpSockStor));
-	struct sockaddr *sadr = (struct sockaddr*) &udpSockStor;
-	socklen_t       sadrLen = sizeof( udpSockStor );
 
+	struct sockaddr         *sadr;
+	socklen_t                sadrLen;
+	if(listening){
+		fprintf(stderr, "RecvUDP listening.\n");
+		memset (&udpSockStor,0,sizeof(udpSockStor));
+		sadrLen = sizeof( udpSockStor );
+		sadr    = (struct sockaddr*) &udpSockStor;
+	}
+	else{
+		sadrLen = 0;
+		sadr    = NULL;
+	}
 	ssize_t inBytes;
 	//do {
 		std::string recvbuf;
-		recvbuf.resize(recvbuflen);
+		recvbuf.resize(recvbuflen+1);
 		inBytes = recvfrom( sock, &recvbuf[0], recvbuflen, 0, sadr, &sadrLen );
 		if(inBytes > 0){
 			buffer+=std::string(recvbuf.begin(),recvbuf.begin()+inBytes);
@@ -173,7 +189,7 @@ bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
 			SYSCALL("recvfrom", __LINE__,  inBytes );
 		}
 	//} while( inBytes > 0 && recvbuflen > 0 );
-	{
+	if(listening){
 		struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
 		PrintAddrInfo(&saddri);
 	}

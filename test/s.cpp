@@ -11,12 +11,12 @@ void Handel(std::unique_ptr<Socket> sp){
 	sp->SetTimeout(2*1000);
 	std::cout << "\n thread: "<<i<< std::endl;
 	std::string res;
-	sp->RecvTCP(res,959); //959
+	sp->Recv(res,959); //959
 	std::cout << res.size() << std::endl;
 
 	std::string str="Hi Client";
 	std::cout << str.size() << std::endl;
-	sp->SendTCP(str);
+	sp->Send(str);
 	//sleep(5);
 	sp->Close();
 }
@@ -42,9 +42,9 @@ int main(int argc, char **argv) {
 	Socket::verbose = true;
 
 	{
-		Socket s(DFLT_HOST,hostPort,hostProtocol,hostFamily);
+		Socket s(DFLT_HOST,hostPort,hostProtocol,hostFamily,true);
 
-		if(s.OpenServer()){
+		if(s.Open()){
 			while(i<1){
 				std::unique_ptr<Socket> sp(new Socket(s.Listen()));
 				if(*sp){
@@ -54,12 +54,12 @@ int main(int argc, char **argv) {
 					s.SetTimeout(2*1000);
 					std::cout << "\n No thread: "<<i<< std::endl;
 					std::string res;
-					s.RecvUDP(res,959); //959
+					s.Recv(res,959); //959
 					std::cout << res.size() << std::endl;
 
 					std::string str="Hi Client";
 					std::cout << str.size() << std::endl;
-					s.SendUDP(str);
+					s.Send(str);
 					//break;
 				}			
 				i++;
