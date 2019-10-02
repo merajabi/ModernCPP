@@ -66,6 +66,71 @@ bool Socket::SetTimeout(unsigned long tout){
 	return true;
 }
 
+bool Socket::SendTo(const std::string& buffer){
+	fprintf(stderr, "SendTo called.\n");
+	if( !SYSCALL("SendTo", __LINE__,  sock )){
+		return false;
+	}
+
+	struct sockaddr         *sadr	 = NULL;
+	socklen_t                sadrLen = 0;
+	if(listening){
+		sadrLen = sizeof( udpSockStor );
+		sadr    = (struct sockaddr*) &udpSockStor;
+	}
+
+	ssize_t wBytes = buffer.size();
+	while ( wBytes > 0 ) {
+		ssize_t count;
+		do {
+			count = sendto( sock,
+							buffer.c_str(),
+							wBytes,
+							0,
+							sadr,        /* Address & address length   */
+							sadrLen );   /*    received in recvfrom(). */
+		} while ( ( count < 0 ) && ( errno == EINTR ) );
+		if(!SYSCALL("write", __LINE__,  count )) {   /* Check for a bona fide error. */
+			return false;
+		}
+		wBytes -= count;
+	}  /* End WHILE there is data to send. */
+	return true;
+}
+bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
+	fprintf(stderr, "RecvFrom called.\n");
+	if( !SYSCALL("RecvFrom", __LINE__,  sock )){
+		return false;
+	}
+
+	struct sockaddr         *sadr	 = NULL;
+	socklen_t                sadrLen = 0;
+	if(listening && protocol=="udp"){
+		sadrLen = sizeof( udpSockStor );
+		sadr    = (struct sockaddr*) &udpSockStor;
+	}
+
+	ssize_t inBytes;
+	do {
+		std::string recvbuf;
+		recvbuf.resize(recvbuflen+1);
+		inBytes = recvfrom( sock, &recvbuf[0], recvbuflen, 0, sadr, &sadrLen );
+		if(inBytes > 0){
+			buffer+=std::string(recvbuf.begin(),recvbuf.begin()+inBytes);
+			recvbuflen-=inBytes;
+		}
+		else if( (inBytes < 0) && (errno != EAGAIN ) ){
+			SYSCALL("recvfrom", __LINE__,  inBytes );
+			return false;
+		}
+	} while( inBytes > 0 && recvbuflen > 0 && protocol=="tcp" );
+	if(listening && protocol=="udp"){
+		struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
+		PrintAddrInfo(&saddri);
+	}
+	return true;
+}
+
 bool Socket::SendTCP(const std::string& buffer){
 	fprintf(stderr, "SendTCP called.\n");
 	if( !SYSCALL("SendTC", __LINE__,  sock )){

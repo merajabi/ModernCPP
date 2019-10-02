@@ -157,6 +157,9 @@ class Socket {
 		bool RecvUDP(std::string& buffer, int recvbuflen);
 		bool RecvTCP(std::string& buffer, int recvbuflen);
 
+		bool SendTo(const std::string& buffer);
+		bool RecvFrom(std::string& buffer, int recvbuflen);
+
 		bool PrintAddrInfo( struct addrinfo *ai );
 	public:
 		/*
@@ -177,10 +180,12 @@ class Socket {
 		}
 
 		bool Send(const std::string& buffer){
-			return (protocol=="tcp")?SendTCP(buffer):SendUDP(buffer);
+			return SendTo(buffer);
+			//return (protocol=="tcp")?SendTCP(buffer):SendUDP(buffer);
 		}
 		bool Recv(std::string& buffer, int recvbuflen){
-			return (protocol=="tcp")?RecvTCP(buffer,recvbuflen):RecvUDP(buffer,recvbuflen);
+			return RecvFrom(buffer,recvbuflen);
+			//return (protocol=="tcp")?RecvTCP(buffer,recvbuflen):RecvUDP(buffer,recvbuflen);
 		}
 
 		int Listen();
