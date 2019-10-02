@@ -165,8 +165,8 @@ class Socket {
 		static boolean     verbose;       			/* Verbose mode indication.     */
 
 	public:
-		Socket(const int& s);
-		Socket(const std::string& pH=DFLT_HOST, const std::string& pP=DFLT_SERVICE, const std::string& proto=DFLT_PROTOCOL,const std::string& family=DFLT_FAMILY, unsigned long tout=0);
+		Socket(int fd,const std::string& protocol=DFLT_PROTOCOL);
+		Socket(const std::string& pH=DFLT_HOST, const std::string& pP=DFLT_SERVICE, const std::string& proto=DFLT_PROTOCOL,const std::string& family=DFLT_FAMILY,bool listening=false, unsigned long tout=0);
 		~Socket();
 
 

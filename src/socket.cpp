@@ -2,9 +2,6 @@
 #include "socket.h"
 
 std::atomic<unsigned long> Socket::sockCount(0);
-//char        Socket::hostBfr[ NI_MAXHOST ];   /* For use w/getnameinfo(3).    */
-//char        Socket::servBfr[ NI_MAXSERV ];   /* For use w/getnameinfo(3).    */
-//const char *Socket::pgmName=NULL;            /* Program name w/o dir prefix. */
 boolean     Socket::verbose = false;         /* Verbose mode indication.     */
 
 boolean SYSCALL( const char *syscallName, int lineNbr, int status ) {
@@ -20,11 +17,11 @@ boolean SYSCALL( const char *syscallName, int lineNbr, int status ) {
 }  /* End SYSCALL() */
 
 
-Socket::Socket(const int& s):sock(s),timeout(0){
+Socket::Socket(int fd,const std::string& protocol):sock(fd),host(DFLT_HOST),service(DFLT_SERVICE),protocol(protocol),family(DFLT_FAMILY),scope(DFLT_SCOPE_ID),listening(false),timeout(0){
 	Initialize();
 }
 
-Socket::Socket(const std::string& pH, const std::string& pP, const std::string& proto, const std::string& family, unsigned long tout): sock(INVALID_SOCKET),host(pH),service(pP),protocol(proto),family(family),scope(DFLT_SCOPE_ID),timeout(tout) {
+Socket::Socket(const std::string& pH, const std::string& pP, const std::string& proto, const std::string& family,bool listening, unsigned long tout): sock(INVALID_SOCKET),host(pH),service(pP),protocol(proto),family(family),scope(DFLT_SCOPE_ID),listening(listening),timeout(tout) {
 	Initialize();
 /*
 	if(host.size()!=0){
@@ -70,6 +67,7 @@ bool Socket::SetTimeout(unsigned long tout){
 }
 
 bool Socket::SendTCP(const std::string& buffer){
+	fprintf(stderr, "SendTCP called.\n");
 	if( !SYSCALL("SendTC", __LINE__,  sock )){
 		return false;
 	}
@@ -90,6 +88,7 @@ bool Socket::SendTCP(const std::string& buffer){
 }
 
 bool Socket::SendUDP(const std::string& buffer){
+	fprintf(stderr, "SendUDP called.\n");
 	if( !SYSCALL("SendTC", __LINE__,  sock )){
 		return false;
 	}
@@ -120,6 +119,7 @@ bool Socket::SendUDP(const std::string& buffer){
 
 // Receive until the peer closes the connection or read recvbuflen bytes
 bool Socket::RecvTCP(std::string& buffer, int recvbuflen){
+	fprintf(stderr, "RecvTCP called.\n");
 	if( !SYSCALL("RecvTC", __LINE__,  sock )){
 		return false;
 	}
@@ -150,6 +150,7 @@ bool Socket::RecvTCP(std::string& buffer, int recvbuflen){
 ** sockaddr_storage to receive the address.
 */
 bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
+	fprintf(stderr, "RecvUDP called.\n");
 	if( !SYSCALL("RecvUC", __LINE__,  sock )){
 		return false;
 	}
@@ -221,6 +222,7 @@ bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
 *    0 on success, -1 on error.
 ******************************************************************************/
 bool Socket::OpenServer( ) {
+	fprintf(stderr, "OpenServer called.\n");
    struct addrinfo *ai;
    struct addrinfo *aiHead;
    struct addrinfo  hints    = { .ai_flags  = AI_PASSIVE };   // Server mode.
@@ -543,6 +545,7 @@ int Socket::Accept () {
 *    address records have been processed and a socket could not be initialized.
 ******************************************************************************/
 bool Socket::OpenClient() {
+	fprintf(stderr, "OpenClient called.\n");
 	struct addrinfo *ai;
 	struct addrinfo *aiHead;
 	struct addrinfo  hints;
