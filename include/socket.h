@@ -48,6 +48,7 @@ struct addrinfo {
 #include <atomic>
 #include <string>
 #include <vector>
+#include <memory>
 
 /*
 ** System header files.
@@ -80,7 +81,6 @@ struct addrinfo {
 #define MAXCONNQLEN			3           /* Max nbr of connection requests to queue. */
 #define VALIDOPTS			"v"         /* Valid command options.                   */
 //#define VALIDOPTS			"s:v"       /* Valid command options.            */
-
 
 /*
 ** Type definitions (for convenience).
@@ -136,29 +136,27 @@ class Select;
 class Socket {
 		static std::atomic<unsigned long> sockCount;
 
+		int 					sock;	// Active Socket
 		std::string				host;
 		std::string				service; // service OR port / DFLT_SERVICE
 		std::string				protocol;
 		std::string				family;
 		std::string				scope;
 		bool					listening;
-		unsigned long timeout;
-
-		int 					sock;	// Active Socket
-
+		unsigned long			timeout;
 		struct sockaddr_storage  udpSockStor;
-	public:
+
 		bool OpenClient();
 		bool OpenServer();
 
-		bool SendUDP(const std::string& buffer);
-		bool SendTCP(const std::string& buffer);
-
-		bool RecvUDP(std::string& buffer, int recvbuflen);
-		bool RecvTCP(std::string& buffer, int recvbuflen);
-
 		bool SendTo(const std::string& buffer);
 		bool RecvFrom(std::string& buffer, int recvbuflen);
+
+		bool SendUDP(const std::string& buffer); //depricated
+		bool SendTCP(const std::string& buffer); //depricated
+
+		bool RecvUDP(std::string& buffer, int recvbuflen); //depricated
+		bool RecvTCP(std::string& buffer, int recvbuflen); //depricated
 
 		bool PrintAddrInfo( struct addrinfo *ai );
 	public:
@@ -172,21 +170,11 @@ class Socket {
 		Socket(const std::string& pH=DFLT_HOST, const std::string& pP=DFLT_SERVICE, const std::string& proto=DFLT_PROTOCOL,const std::string& family=DFLT_FAMILY,bool listening=false, unsigned long tout=0);
 		~Socket();
 
-
 		bool SetTimeout(unsigned long tout);
 		bool Close();
-		bool Open(){
-			return (listening)?OpenServer():OpenClient();
-		}
-
-		bool Send(const std::string& buffer){
-			return SendTo(buffer);
-			//return (protocol=="tcp")?SendTCP(buffer):SendUDP(buffer);
-		}
-		bool Recv(std::string& buffer, int recvbuflen){
-			return RecvFrom(buffer,recvbuflen);
-			//return (protocol=="tcp")?RecvTCP(buffer,recvbuflen):RecvUDP(buffer,recvbuflen);
-		}
+		bool Open(){ return (listening)?OpenServer():OpenClient();}
+		bool Send(const std::string& buffer){ return SendTo(buffer);}
+		bool Recv(std::string& buffer, int recvbuflen){ return RecvFrom(buffer,recvbuflen);}
 
 		int Listen();
 		int Accept();
@@ -220,11 +208,9 @@ class Socket {
 };
 
 class socket_guard {
-	int sock;
+		int sock;
 	public:
 		socket_guard(int sock=INVALID_SOCKET):sock(sock){
-		};
-		socket_guard(const Socket& s):sock(s.GetFD()){
 		};
 		~socket_guard(){
 			if( sock != INVALID_SOCKET ) {
@@ -242,6 +228,31 @@ class socket_guard {
 		}
 };
 
+class SocketGuard {
+		std::shared_ptr<unsigned long> guardCountPtr;
+		Socket socket;
+	public:
+		SocketGuard(const Socket& socket):socket(socket),guardCountPtr(new unsigned long){
+			//guardCountPtr=new unsigned long;
+			(*guardCountPtr)=1;
+			std::cerr << "SocketGuard: " << *guardCountPtr << " Socket: " << socket.GetFD() <<std::endl;
+		};
+		SocketGuard(const SocketGuard& sg):socket(sg.socket),guardCountPtr(sg.guardCountPtr){
+			(*guardCountPtr)++;
+		};
+
+		~SocketGuard(){
+			(*guardCountPtr)--;
+			std::cerr << "~SocketGuard: " << *guardCountPtr << " Socket: " << socket.GetFD() <<std::endl;
+			if( (*guardCountPtr) == 0){
+				socket.Close();
+				//delete guardCountPtr;
+			}
+		}
+		Socket& get(){
+			return socket;
+		}
+};
 
 #endif //_WIN_SOCKET_H_
 

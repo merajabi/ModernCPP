@@ -40,6 +40,7 @@ Socket::~Socket(){
 }
 
 bool Socket::Close(){
+	fprintf( stderr,"Socket: %d Closed.\n",sock);
 	bool result = false;
 	if( sock >=0 ){
 		if( SYSCALL( "close", __LINE__, close( sock ) ) ) {
@@ -67,7 +68,6 @@ bool Socket::SetTimeout(unsigned long tout){
 }
 
 bool Socket::SendTo(const std::string& buffer){
-	fprintf(stderr, "SendTo called.\n");
 	if( !SYSCALL("SendTo", __LINE__,  sock )){
 		return false;
 	}
@@ -98,7 +98,6 @@ bool Socket::SendTo(const std::string& buffer){
 	return true;
 }
 bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
-	fprintf(stderr, "RecvFrom called.\n");
 	if( !SYSCALL("RecvFrom", __LINE__,  sock )){
 		return false;
 	}
@@ -131,135 +130,6 @@ bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
 	return true;
 }
 
-bool Socket::SendTCP(const std::string& buffer){
-	fprintf(stderr, "SendTCP called.\n");
-	if( !SYSCALL("SendTC", __LINE__,  sock )){
-		return false;
-	}
-    ssize_t wBytes = buffer.size();
-    while ( wBytes > 0 ) {
-		ssize_t count;
-		do {
-			count = write( sock,
-				         buffer.c_str(),
-				         wBytes );
-		} while ( ( count < 0 ) && ( errno == EINTR ) );
-		if(!SYSCALL("write", __LINE__,  count )) {   /* Check for a bona fide error. */
-			return false;
-		}
-		wBytes -= count;
-	}  /* End WHILE there is data to send. */
-	return true;
-}
-
-// Receive until the peer closes the connection or read recvbuflen bytes
-bool Socket::RecvTCP(std::string& buffer, int recvbuflen){
-	fprintf(stderr, "RecvTCP called.\n");
-	if( !SYSCALL("RecvTC", __LINE__,  sock )){
-		return false;
-	}
-	ssize_t inBytes;
-	do {
-		char recvbuf[DEFAULT_BUFLEN];
-		inBytes = read(sock, recvbuf, (recvbuflen<DEFAULT_BUFLEN)?recvbuflen:DEFAULT_BUFLEN);
-		if(inBytes > 0){
-			buffer+=std::string(recvbuf,recvbuf+inBytes);
-			recvbuflen-=inBytes;
-		}
-		else if( (inBytes < 0) && (errno != EAGAIN ) ){
-			SYSCALL("read", __LINE__,  inBytes );
-			return false;
-		}
-	} while( inBytes > 0 && recvbuflen > 0 );
-	return true;
-}
-
-/*
-** This is a UDP socket, and a datagram is available.  The funny
-** thing about UDP requests is that this server doesn't require any
-** client input; but it can't send the TOD unless it knows a client
-** wants the data, and the only way that can occur with UDP is if
-** the server receives a datagram from the client.  Thus, the
-** server must receive _something_, but the content of the datagram
-** is irrelevant.  Read in the datagram.  Again note the use of
-** sockaddr_storage to receive the address.
-*/
-
-bool Socket::SendUDP(const std::string& buffer){
-	fprintf(stderr, "SendUDP called.\n");
-	if( !SYSCALL("SendTC", __LINE__,  sock )){
-		return false;
-	}
-
-	struct sockaddr         *sadr;
-	socklen_t                sadrLen;
-	if(listening){
-		sadrLen = sizeof( udpSockStor );
-		sadr    = (struct sockaddr*) &udpSockStor;
-	}
-	else{
-		sadrLen = 0;
-		sadr    = NULL;
-	}
-
-    ssize_t wBytes = buffer.size();
-	ssize_t count;
-	while ( wBytes > 0 ) {
-		do {
-			count = sendto( sock,
-						  buffer.c_str(),
-						  wBytes,
-						  0,
-						  sadr,        /* Address & address length   */
-						  sadrLen );   /*    received in recvfrom(). */
-		} while ( ( count < 0 ) && ( errno == EINTR ) );
-		if(!SYSCALL("write", __LINE__,  count )) {   /* Check for a bona fide error. */
-			return false;
-		}
-		wBytes -= count;
-	}  /* End WHILE there is data to send. */
-	return true;
-}
-
-bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
-	fprintf(stderr, "RecvUDP called.\n");
-	if( !SYSCALL("RecvUC", __LINE__,  sock )){
-		return false;
-	}
-	bool result = false;
-
-	struct sockaddr         *sadr;
-	socklen_t                sadrLen;
-	if(listening){
-		fprintf(stderr, "RecvUDP listening.\n");
-		memset (&udpSockStor,0,sizeof(udpSockStor));
-		sadrLen = sizeof( udpSockStor );
-		sadr    = (struct sockaddr*) &udpSockStor;
-	}
-	else{
-		sadrLen = 0;
-		sadr    = NULL;
-	}
-	ssize_t inBytes;
-	//do {
-		std::string recvbuf;
-		recvbuf.resize(recvbuflen+1);
-		inBytes = recvfrom( sock, &recvbuf[0], recvbuflen, 0, sadr, &sadrLen );
-		if(inBytes > 0){
-			buffer+=std::string(recvbuf.begin(),recvbuf.begin()+inBytes);
-			recvbuflen-=inBytes;
-			result = true;
-		}
-		else if( (inBytes < 0) && (errno != EAGAIN ) ){
-			SYSCALL("recvfrom", __LINE__,  inBytes );
-		}
-	//} while( inBytes > 0 && recvbuflen > 0 );
-	if(listening){
-		struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
-		PrintAddrInfo(&saddri);
-	}
-	return result;
-}
 
 /*
 ** Open a connection to the indicated host/service.
@@ -275,9 +145,135 @@ bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
 ** sockets).
 */
 
+int Socket::Accept () {
+	/*
+	** Determine if this is a TCP request or UDP request.
+	*/
+	if ( protocol == "tcp") {
+		/*
+		** TCP connection requested.  Accept it.  Notice the use of
+		** the sockaddr_storage data type.
+		*/
+		struct sockaddr_storage  sockStor;
+		struct sockaddr         *sadr = (struct sockaddr*) &sockStor;
+		socklen_t                sadrLen = sizeof( sockStor );
+
+		socket_guard newSG( accept( sock, sadr, &sadrLen ) );
+
+		if(!SYSCALL("accept", __LINE__, newSG.get() ) ) {
+			return INVALID_SOCKET;
+		}
+
+		{
+			struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
+			PrintAddrInfo(&saddri);
+		}
+		fprintf( stderr,"Socket: %d Opened.\n",newSG.get());
+		return newSG.release();
+
+	}  /* End IF this was a TCP connection request. */
+	//	********************  Added for Socket Class ********************
+	else {
+		return INVALID_SOCKET;
+
+	}/* End ELSE a UDP datagram is available. */
+	//	********************  Added for Socket Class ********************
+}
+/******************************************************************************
+* Function: Listen
+*
+* Description:
+*    Listen on a set of sockets and send the current time-of-day to any
+*    clients.  This function never returns.
+*
+* Parameters:
+*    tSckt     - Array of TCP socket descriptors on which to listen.
+*    tScktSize - Size of the tSckt array (nbr of elements).
+*    uSckt     - Array of UDP socket descriptors on which to listen.
+*    uScktSize - Size of the uSckt array (nbr of elements).
+*
+* Return Value: Socket descriptors which has new activity
+******************************************************************************/
+int Socket::Listen() {
+	std::vector<struct pollfd> desc;
+	int                      newSckt;
+	
+	if( sock < 0 ) { // Socket not open
+         fprintf( stderr,
+                  "%s (line %d): ERROR - Socket: Socket not open ",
+                  "Socket",
+                  __LINE__);
+
+		return INVALID_SOCKET;
+	}
+
+	/*
+	** Initialize the poll(2) array.
+	*/
+	{
+		struct pollfd pfd;
+		pfd.fd      = sock;
+		pfd.events  = POLLIN;
+		pfd.revents = 0;
+		desc.push_back(pfd);
+	}
+
+	/*
+	** Main time-of-day server loop.  Handles both TCP & UDP requests.  This is
+	** an interative server, and all requests are handled directly within the
+	** main loop.
+	*/
+	while ( true ) {  /* Do forever. */
+		/*
+		** Wait for activity on one of the sockets.  The DO..WHILE construct is
+		** used to restart the system call in the event the process is
+		** interrupted by a signal.
+		*/
+		int status;
+		do {
+			status = poll( &desc[0], desc.size(), -1 ); /* Wait indefinitely for input. */
+		} while ( ( status < 0 ) && ( errno == EINTR ) );
+
+		if(!SYSCALL("poll", __LINE__,  status )){   /* Check for a bona fide system call error. */
+			return INVALID_SOCKET;
+		}
+
+		/*
+		** Indicate that there is new network activity.
+		*/
+		if ( verbose ) {
+			fprintf( stderr, "%s: New network activity.\n", "Socket");
+		}  /* End IF verbose. */
+
+		/*
+		** Process sockets with input available.
+		*/
+		int idx = 0;
+			switch ( desc[ idx ].revents ) {
+				case 0:        /* No activity on this socket; try the next. */
+					break;
+				case POLLIN:   /* Network activity.  Go process it.         */
+					desc[ idx ].revents = 0;   /* Clear the returned poll events. */
+					return Accept(); //desc[ idx ].fd
+					break;
+
+				default:       /* Invalid poll events.                      */
+					{
+						fprintf( stderr,
+							"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
+							"Socket",
+							__LINE__,
+							desc[ idx ].revents );
+						return INVALID_SOCKET;
+					}
+			}  /* End SWITCH on returned poll events. */
+	}  /* End WHILE forever. */
+}  /* End tod() */
+
+
 
 /******************************************************************************
-* Function: openSckt
+* Function: OpenServer
 *
 * Description:
 *    Open passive (server) sockets for the indicated inet service & protocol.
@@ -470,137 +466,13 @@ bool Socket::OpenServer( ) {
    ** Clean up.
    */
    freeaddrinfo( aiHead );
+	fprintf( stderr,"Socket: %d Opened.\n",sock);
    return true;
 }  /* End openSckt() */
 
 
 /******************************************************************************
-* Function: Listen
-*
-* Description:
-*    Listen on a set of sockets and send the current time-of-day to any
-*    clients.  This function never returns.
-*
-* Parameters:
-*    tSckt     - Array of TCP socket descriptors on which to listen.
-*    tScktSize - Size of the tSckt array (nbr of elements).
-*    uSckt     - Array of UDP socket descriptors on which to listen.
-*    uScktSize - Size of the uSckt array (nbr of elements).
-*
-* Return Value: Socket descriptors which has new activity
-******************************************************************************/
-int Socket::Listen() {
-	std::vector<struct pollfd> desc;
-	int                      newSckt;
-	
-	if( sock < 0 ) { // Socket not open
-         fprintf( stderr,
-                  "%s (line %d): ERROR - Socket: Socket not open ",
-                  "Socket",
-                  __LINE__);
-
-		return INVALID_SOCKET;
-	}
-
-	/*
-	** Initialize the poll(2) array.
-	*/
-	{
-		struct pollfd pfd;
-		pfd.fd      = sock;
-		pfd.events  = POLLIN;
-		pfd.revents = 0;
-		desc.push_back(pfd);
-	}
-
-	/*
-	** Main time-of-day server loop.  Handles both TCP & UDP requests.  This is
-	** an interative server, and all requests are handled directly within the
-	** main loop.
-	*/
-	while ( true ) {  /* Do forever. */
-		/*
-		** Wait for activity on one of the sockets.  The DO..WHILE construct is
-		** used to restart the system call in the event the process is
-		** interrupted by a signal.
-		*/
-		int status;
-		do {
-			status = poll( &desc[0], desc.size(), -1 ); /* Wait indefinitely for input. */
-		} while ( ( status < 0 ) && ( errno == EINTR ) );
-
-		if(!SYSCALL("poll", __LINE__,  status )){   /* Check for a bona fide system call error. */
-			return INVALID_SOCKET;
-		}
-
-		/*
-		** Indicate that there is new network activity.
-		*/
-		if ( verbose ) {
-			fprintf( stderr, "%s: New network activity.\n", "Socket");
-		}  /* End IF verbose. */
-
-		/*
-		** Process sockets with input available.
-		*/
-		int idx = 0;
-			switch ( desc[ idx ].revents ) {
-				case 0:        /* No activity on this socket; try the next. */
-					break;
-				case POLLIN:   /* Network activity.  Go process it.         */
-					desc[ idx ].revents = 0;   /* Clear the returned poll events. */
-					return Accept(); //desc[ idx ].fd
-					break;
-
-				default:       /* Invalid poll events.                      */
-					{
-						fprintf( stderr,
-							"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
-							"Socket",
-							__LINE__,
-							desc[ idx ].revents );
-						return INVALID_SOCKET;
-					}
-			}  /* End SWITCH on returned poll events. */
-	}  /* End WHILE forever. */
-}  /* End tod() */
-
-int Socket::Accept () {
-	/*
-	** Determine if this is a TCP request or UDP request.
-	*/
-	if ( protocol == "tcp") {
-		/*
-		** TCP connection requested.  Accept it.  Notice the use of
-		** the sockaddr_storage data type.
-		*/
-		struct sockaddr_storage  sockStor;
-		struct sockaddr         *sadr = (struct sockaddr*) &sockStor;
-		socklen_t                sadrLen = sizeof( sockStor );
-
-		socket_guard newSG( accept( sock, sadr, &sadrLen ) );
-
-		if(!SYSCALL("accept", __LINE__, newSG.get() ) ) {
-			return INVALID_SOCKET;
-		}
-
-		{
-			struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
-			PrintAddrInfo(&saddri);
-		}
-
-		return newSG.release();
-
-	}  /* End IF this was a TCP connection request. */
-	//	********************  Added for Socket Class ********************
-	else {
-		return INVALID_SOCKET;
-
-	}/* End ELSE a UDP datagram is available. */
-	//	********************  Added for Socket Class ********************
-}
-/******************************************************************************
-* Function: openSckt
+* Function: OpenClient
 *
 * Description:
 *    Sets up a UDP/TCP socket to a remote server.  Getaddrinfo(3) is used to
@@ -711,6 +583,7 @@ bool Socket::OpenClient() {
 		{
 			freeaddrinfo( aiHead );
 			sock = sg.release();
+			fprintf( stderr,"Socket: %d Opened.\n",sock);
 			return true;
 		}
 	}  /* End FOR each address record returned by getaddrinfo(3). */
@@ -827,4 +700,134 @@ bool Socket::PrintAddrInfo( struct addrinfo *sadr ){
 	return true;
 }
 
+
+bool Socket::SendTCP(const std::string& buffer){
+	fprintf(stderr, "SendTCP called.\n");
+	if( !SYSCALL("SendTC", __LINE__,  sock )){
+		return false;
+	}
+    ssize_t wBytes = buffer.size();
+    while ( wBytes > 0 ) {
+		ssize_t count;
+		do {
+			count = write( sock,
+				         buffer.c_str(),
+				         wBytes );
+		} while ( ( count < 0 ) && ( errno == EINTR ) );
+		if(!SYSCALL("write", __LINE__,  count )) {   /* Check for a bona fide error. */
+			return false;
+		}
+		wBytes -= count;
+	}  /* End WHILE there is data to send. */
+	return true;
+}
+
+// Receive until the peer closes the connection or read recvbuflen bytes
+bool Socket::RecvTCP(std::string& buffer, int recvbuflen){
+	fprintf(stderr, "RecvTCP called.\n");
+	if( !SYSCALL("RecvTC", __LINE__,  sock )){
+		return false;
+	}
+	ssize_t inBytes;
+	do {
+		char recvbuf[DEFAULT_BUFLEN];
+		inBytes = read(sock, recvbuf, (recvbuflen<DEFAULT_BUFLEN)?recvbuflen:DEFAULT_BUFLEN);
+		if(inBytes > 0){
+			buffer+=std::string(recvbuf,recvbuf+inBytes);
+			recvbuflen-=inBytes;
+		}
+		else if( (inBytes < 0) && (errno != EAGAIN ) ){
+			SYSCALL("read", __LINE__,  inBytes );
+			return false;
+		}
+	} while( inBytes > 0 && recvbuflen > 0 );
+	return true;
+}
+
+/*
+** This is a UDP socket, and a datagram is available.  The funny
+** thing about UDP requests is that this server doesn't require any
+** client input; but it can't send the TOD unless it knows a client
+** wants the data, and the only way that can occur with UDP is if
+** the server receives a datagram from the client.  Thus, the
+** server must receive _something_, but the content of the datagram
+** is irrelevant.  Read in the datagram.  Again note the use of
+** sockaddr_storage to receive the address.
+*/
+
+bool Socket::SendUDP(const std::string& buffer){
+	fprintf(stderr, "SendUDP called.\n");
+	if( !SYSCALL("SendTC", __LINE__,  sock )){
+		return false;
+	}
+
+	struct sockaddr         *sadr;
+	socklen_t                sadrLen;
+	if(listening){
+		sadrLen = sizeof( udpSockStor );
+		sadr    = (struct sockaddr*) &udpSockStor;
+	}
+	else{
+		sadrLen = 0;
+		sadr    = NULL;
+	}
+
+    ssize_t wBytes = buffer.size();
+	ssize_t count;
+	while ( wBytes > 0 ) {
+		do {
+			count = sendto( sock,
+						  buffer.c_str(),
+						  wBytes,
+						  0,
+						  sadr,        /* Address & address length   */
+						  sadrLen );   /*    received in recvfrom(). */
+		} while ( ( count < 0 ) && ( errno == EINTR ) );
+		if(!SYSCALL("write", __LINE__,  count )) {   /* Check for a bona fide error. */
+			return false;
+		}
+		wBytes -= count;
+	}  /* End WHILE there is data to send. */
+	return true;
+}
+
+bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
+	fprintf(stderr, "RecvUDP called.\n");
+	if( !SYSCALL("RecvUC", __LINE__,  sock )){
+		return false;
+	}
+	bool result = false;
+
+	struct sockaddr         *sadr;
+	socklen_t                sadrLen;
+	if(listening){
+		fprintf(stderr, "RecvUDP listening.\n");
+		memset (&udpSockStor,0,sizeof(udpSockStor));
+		sadrLen = sizeof( udpSockStor );
+		sadr    = (struct sockaddr*) &udpSockStor;
+	}
+	else{
+		sadrLen = 0;
+		sadr    = NULL;
+	}
+	ssize_t inBytes;
+	//do {
+		std::string recvbuf;
+		recvbuf.resize(recvbuflen+1);
+		inBytes = recvfrom( sock, &recvbuf[0], recvbuflen, 0, sadr, &sadrLen );
+		if(inBytes > 0){
+			buffer+=std::string(recvbuf.begin(),recvbuf.begin()+inBytes);
+			recvbuflen-=inBytes;
+			result = true;
+		}
+		else if( (inBytes < 0) && (errno != EAGAIN ) ){
+			SYSCALL("recvfrom", __LINE__,  inBytes );
+		}
+	//} while( inBytes > 0 && recvbuflen > 0 );
+	if(listening){
+		struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
+		PrintAddrInfo(&saddri);
+	}
+	return result;
+}
 
