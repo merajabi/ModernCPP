@@ -75,22 +75,13 @@ struct addrinfo {
 #define DFLT_FAMILY			"ipv6"   	// AF_INET, AF_INET6, AF_UNSPEC
 #define DFLT_SCOPE_ID		"eth0"      // Default scope identifier.
 
-#define INVALID_DESC		-1          /* Invalid file descriptor.          */
-#define INVALID_SOCKET		-1
-#define MAXBFRSIZE			256         /* Max bfr sz to read remote TOD.    */
-#define DEFAULT_BUFLEN		256
-#define MAXCONNQLEN			3           /* Max nbr of connection requests to queue. */
-#define VALIDOPTS			"v"         /* Valid command options.                   */
-//#define VALIDOPTS			"s:v"       /* Valid command options.            */
+#define INVALID_SOCKET		-1			// Invalid file descriptor.
+#define MAXCONNQLEN			3           // Max nbr of connection requests to queue.
 
 /*
 ** Type definitions (for convenience).
 */
-// typedef enum { false = 0, true } boolean;
-typedef bool boolean;
 typedef int SOCKET;
-typedef struct sockaddr_in       sockaddr_in_t;
-typedef struct sockaddr_in6      sockaddr_in6_t;
 
 /*
 ** Macro to terminate the program if a system call error occurs.  The system
@@ -129,27 +120,33 @@ typedef struct sockaddr_in6      sockaddr_in6_t;
 **          }
 */
 
-//static __inline boolean SYSCALL( const char *syscallName, int lineNbr, int status );
-boolean SYSCALL( const char *syscallName, int lineNbr, int status );
-
-class Select;
+bool SYSCALL( const std::string& syscallName, int lineNbr, int status );
 
 class socket_guard {
 		mutable int sock;
 	public:
 		socket_guard(int sock=INVALID_SOCKET):sock(sock){
 		};
-		~socket_guard(){
-			if( sock != INVALID_SOCKET ) {
-				SYSCALL( "close", __LINE__, close( sock ));
-				sock = INVALID_SOCKET;
-			}
+		socket_guard(const socket_guard& sg):sock(sg.sock){
+			sg.sock=INVALID_SOCKET;
 		}
 		socket_guard& operator = (const socket_guard& sg){
 			assert(sock==INVALID_SOCKET);
 			sock=sg.sock;
 			sg.sock=INVALID_SOCKET;
 			return *this;
+		}
+		~socket_guard(){
+			close();
+		}
+		bool close(){
+			fprintf( stderr,"Socket id: %d Closed.\n",sock);
+			bool result = false;
+			if( sock != INVALID_SOCKET ){
+				result = SYSCALL( "close", __LINE__, ::close( sock ) );
+				sock = INVALID_SOCKET;
+			}
+			return result;
 		}
 		int get() const {
 			return sock;
@@ -162,109 +159,57 @@ class socket_guard {
 		void reset(){
 			sock = INVALID_SOCKET;
 		}
-
 };
 
 class Socket {
 		static std::atomic<unsigned long> sockCount;
 
 		std::shared_ptr<socket_guard>	sockGuard;	// Active Socket
-		std::string						host;
-		std::string						service; // service OR port / DFLT_SERVICE
-		std::string						protocol;
+		std::string						host;		// the hostname or IP address (IPv4 or IPv6) of the remote server.
+		std::string						service;	// the service name or well-known port number.
+		std::string						protocol;	//
 		std::string						family;
-		std::string						scope;
+		std::string						scope;		// For IPv6 sockets only.  
+													// This is the index corresponding to the network interface on which to exchange datagrams/streams.
+													// This parameter is ignored for IPv4 sockets or when an IPv6 "scoped address" is specified in 'host' 
+													// (i.e. where the colon-hex network address is augmented with the scope ID).
 		bool							listening;
 		unsigned long					timeout;
 		struct sockaddr_storage			udpSockStor;
+
+		static bool Initialize();
+		static void Finalize();
 
 		bool OpenClient();
 		bool OpenServer();
 
 		bool SendTo(const std::string& buffer);
 		bool RecvFrom(std::string& buffer, int recvbuflen);
-
-		bool SendUDP(const std::string& buffer); //depricated
-		bool SendTCP(const std::string& buffer); //depricated
-
-		bool RecvUDP(std::string& buffer, int recvbuflen); //depricated
-		bool RecvTCP(std::string& buffer, int recvbuflen); //depricated
-
 		bool PrintAddrInfo( struct addrinfo *ai );
 	public:
-		/*
-		** Global (within this file only) data objects.
-		*/
-		static boolean     verbose;       			/* Verbose mode indication.     */
+		static bool     verbose;       			/* Verbose mode indication.     */
 
-	public:
-		Socket(int fd,const std::string& protocol=DFLT_PROTOCOL);
-		Socket(const std::string& pH=DFLT_HOST, const std::string& pP=DFLT_SERVICE, const std::string& proto=DFLT_PROTOCOL,const std::string& family=DFLT_FAMILY,bool listening=false, unsigned long tout=0);
+		Socket(const socket_guard& sg=INVALID_SOCKET);
+		Socket(const std::string& host, const std::string& service=DFLT_SERVICE, const std::string& protocol=DFLT_PROTOCOL,const std::string& family=DFLT_FAMILY,bool listening=false, unsigned long timeout=0);
 		~Socket();
+		Socket(const Socket& s);
+		Socket& operator = (const Socket& s);
 
-		bool SetTimeout(unsigned long tout);
+
 		bool Close();
 		bool Open(){ return (listening)?OpenServer():OpenClient();}
 		bool Send(const std::string& buffer){ return SendTo(buffer);}
 		bool Recv(std::string& buffer, int recvbuflen){ return RecvFrom(buffer,recvbuflen);}
 
-		int Listen();
-		int Accept();
+		socket_guard Listen();
+		socket_guard Accept();
 
 		int GetFD() const {return sockGuard->get();}
+		bool SetTimeout(unsigned long tout);
+		bool Listening() const {return listening;}
+		const std::string& Protocol() const {return protocol;}
 		operator bool () const {return ( sockGuard->get() >= 0 );}
-
-		friend class Select;
-
-	private:
-		static bool Initialize(){
-			if( 0 == sockCount++ ){
-				int iResult;
-/*
-				// Initialize Winsock
-				iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
-				if (iResult != 0) {
-					printf("WSAStartup failed with error: %d\n", iResult);
-					return false;
-				}
-*/
-			}
-			return true;
-		}
-		static void Finalize(){
-			if( --sockCount == 0 ){
-				//WSACleanup();
-			}
-		}
-
 };
 
-/* I used different approach, creating a shared_ptr from socket_guard insted of bare "int sock" solved the problem :)
-class SocketGuard {
-		std::shared_ptr<unsigned long> guardCountPtr;
-		Socket socket;
-	public:
-		SocketGuard(const Socket& socket):socket(socket),guardCountPtr(new unsigned long){
-			//guardCountPtr=new unsigned long;
-			(*guardCountPtr)=1;
-			std::cerr << "SocketGuard: " << *guardCountPtr << " Socket: " << socket.GetFD() <<std::endl;
-		};
-		SocketGuard(const SocketGuard& sg):socket(sg.socket),guardCountPtr(sg.guardCountPtr){
-			(*guardCountPtr)++;
-		};
-
-		~SocketGuard(){
-			(*guardCountPtr)--;
-			std::cerr << "~SocketGuard: " << *guardCountPtr << " Socket: " << socket.GetFD() <<std::endl;
-			if( (*guardCountPtr) == 0){
-				socket.Close();
-				//delete guardCountPtr;
-			}
-		}
-		Socket& get(){
-			return socket;
-		}
-};
-*/
 #endif //_WIN_SOCKET_H_
 

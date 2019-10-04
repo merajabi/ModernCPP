@@ -9,7 +9,6 @@
 #include "select.h"
 
 int connections=0;
-
 void Handel(Socket& sp){
 	sp.SetTimeout(2*1000);
 	std::cerr << "\n connections: "<<connections<< std::endl;
@@ -20,19 +19,8 @@ void Handel(Socket& sp){
 	std::string str="Hi Client";
 	std::cerr << str.size() << std::endl;
 	sp.Send(str);
-}
-
-
-void HandelPtr(std::unique_ptr<Socket> sp){
-	sp->SetTimeout(2*1000);
-	std::cerr << "\n connections: "<<connections<< std::endl;
-	std::string res;
-	sp->Recv(res,959); //959
-	std::cerr << res.size() << std::endl;
-
-	std::string str="Hi Client";
-	std::cerr << str.size() << std::endl;
-	sp->Send(str);
+	//sp->Close();
+	//sleep(5);
 }
 
 int main(int argc, char **argv) {
@@ -61,18 +49,18 @@ int main(int argc, char **argv) {
 		while( pool.Listen(selected) ){//connections<4 && 
 			std::cerr << "\nNew network activity.\n" << std::endl;
 			for(int i=0; i < selected.size(); i++ ){
-				/*std::unique_ptr<Socket> sp( new Socket(selected[i].Accept()) );
-				if(*sp){
-						std::thread t( HandelPtr, std::move(sp) );
-						t.detach();
-				}*/
-				Socket sp( selected[i].Accept() );
-				if(sp){
-						std::thread t( Handel, std::ref(sp) );
-						t.join();
-				}
-				else{
+				if( selected[i].Listening() && selected[i].Protocol()=="tcp"){
+					Socket sp( selected[i].Accept() );
+					if(sp){
+						pool.Add(sp);
+						//std::thread t( Handel, std::ref(sp) );
+						//t.join();
+					}
+				}else{
 					Handel( selected[i] );
+					if( !selected[i].Listening() && selected[i].Protocol()=="tcp"){
+						pool.Remove(selected[i]);
+					}
 				}			
 			};
 			connections++;

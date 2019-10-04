@@ -1,10 +1,11 @@
 #ifndef _POSIX_SOCKET_SELECT_H_
 #define _POSIX_SOCKET_SELECT_H_
-
+#include <map>
 #include "socket.h"
 
 class Select {
-	std::vector<Socket>        scktList;	// Array of TCP socket descriptors. MAXTCPSCKTS
+	std::map<int,Socket>		sockMap;	// Map of Socket Objects
+	std::vector<struct pollfd>	descVec;	// Array of socket descriptors. 
 
 	public:
 	bool Add(const Socket& s);

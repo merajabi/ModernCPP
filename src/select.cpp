@@ -1,40 +1,45 @@
 
 #include "select.h"
 
+/*
+** Initialize the poll(2) array.
+*/
 bool Select::Add(const Socket& s){
-	/*
-	** Bump index to next descriptor array element.
-	*/
-	if ( s.protocol == "tcp" || s.protocol == "udp") {      /* TCP protocol.  UDP protocol.   */
-		scktList.push_back(s);
+	if( sockMap.insert(std::pair<int,Socket>(s.GetFD(),s)).second ){
+		{
+			struct pollfd pfd;
+			pfd.fd      = s.GetFD();
+			pfd.events  = POLLIN;
+			pfd.revents = 0;
+			descVec.push_back(pfd);
+		}
 		return true;
 	}
 	return false;
 }
 
 bool Select::Remove(const Socket& s){
+	if( sockMap.erase(s.GetFD()) ){
+		std::vector<struct pollfd>::iterator it;
+		for(it = descVec.end(); it-- != descVec.begin() ;){
+			if( it->fd == s.GetFD() ){
+				descVec.erase(it);
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 bool Select::Listen(std::vector<Socket>& selected){
-	std::vector<struct pollfd> desc;
-
-	/*
-	** Initialize the poll(2) array.
-	*/
-	for ( int idx = 0;     idx < scktList.size();     idx++ ) {
-		struct pollfd pfd;
-		pfd.fd      = scktList[ idx ].GetFD();
-		pfd.events  = POLLIN;
-		pfd.revents = 0;
-		desc.push_back(pfd);
+	if(!descVec.size()){
+		return false;
 	}
-
 	/*
 	** Main server loop.  Handles both TCP & UDP requests.
 	*/
-	while ( true ) {  /* Do forever. */
-		selected.clear();
-
+	bool activity = false;
+	do {  /* Do forever. */
 		/*
 		** Wait for activity on one of the sockets.  The DO..WHILE construct is
 		** used to restart the system call in the event the process is
@@ -42,9 +47,8 @@ bool Select::Listen(std::vector<Socket>& selected){
 		*/
 		int status;
 		do {
-			status = poll( &desc[0], desc.size(), -1 ); /* Wait indefinitely for input. */
+			status = poll( &descVec[0], descVec.size(), -1 ); /* Wait indefinitely for input. */
 		} while ( ( status < 0 ) && ( errno == EINTR ) );
-
 		if(!SYSCALL("poll", __LINE__,  status )){   /* Check for a bona fide system call error. */
 			return false;
 		}
@@ -52,13 +56,14 @@ bool Select::Listen(std::vector<Socket>& selected){
 		/*
 		** Process sockets with input available.
 		*/
-		for ( int idx = 0;     idx < desc.size();     idx++ ) {
-			switch ( desc[ idx ].revents ) {
+		for ( int idx = 0;     idx < descVec.size();     idx++ ) {
+			switch ( descVec[ idx ].revents ) {
 				case 0:        /* No activity on this socket; try the next. */
 					continue;
 				case POLLIN:   /* Network activity.  Go process it.         */
-					desc[ idx ].revents = 0;   /* Clear the returned poll events. */
-					selected.push_back( scktList[ idx ] );
+					descVec[ idx ].revents = 0;   /* Clear the returned poll events. */
+					selected.push_back( sockMap[ descVec[ idx ].fd ] );
+					activity = true;
 					break;
 				default:       /* Invalid poll events.                      */
 					{
@@ -66,14 +71,12 @@ bool Select::Listen(std::vector<Socket>& selected){
 							"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
 							"Select",
 							__LINE__,
-							desc[ idx ].revents );
+							descVec[ idx ].revents );
 						return false;
 					}
 			}  /* End SWITCH on returned poll events. */
 		}  /* End FOR each socket descriptor. */
-		if(selected.size()){
-			return true;
-		}
-	}  /* End WHILE forever. */
+	}while(!activity);  /* End WHILE forever. */
+	return activity;
 }  /* End Listen() */
 

@@ -1,56 +1,75 @@
-#include <string>
-#include <assert.h>
-
 #include "socket.h"
 
 std::atomic<unsigned long> Socket::sockCount(0);
-boolean     Socket::verbose = false;         /* Verbose mode indication.     */
+bool     Socket::verbose = false;         /* Verbose mode indication.     */
 
-boolean SYSCALL( const char *syscallName, int lineNbr, int status ) {
+bool SYSCALL( const std::string& syscallName, int lineNbr, int status ) {
    if ( ( status == -1 ) && Socket::verbose ) {
       fprintf( stderr,
                "%s (line %d): System call failed ('%s') - %s.\n",
                "Socket",
                lineNbr,
-               syscallName,
+               syscallName.c_str(),
                strerror( errno ) );
    }
    return (status != -1);   /* True if the system call was successful. */
 }  /* End SYSCALL() */
 
-
-Socket::Socket(int fd,const std::string& protocol):sockGuard(new socket_guard(fd)), host(DFLT_HOST), service(DFLT_SERVICE), protocol(protocol), family(DFLT_FAMILY), scope(DFLT_SCOPE_ID), listening(false), timeout(0){
-	Initialize();
+bool Socket::Initialize(){
+	if( 0 == sockCount++ ){
+		int iResult;
+/*
+		// Initialize Winsock
+		iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+		if (iResult != 0) {
+			printf("WSAStartup failed with error: %d\n", iResult);
+			return false;
+		}
+*/
+	}
+	return true;
 }
 
-Socket::Socket(const std::string& pH, const std::string& pP, const std::string& proto, const std::string& family,bool listening, unsigned long tout): sockGuard(new socket_guard()), host(pH), service(pP), protocol(proto), family(family), scope(DFLT_SCOPE_ID), listening(listening), timeout(tout) {
+void Socket::Finalize(){
+	if( --sockCount == 0 ){
+		//WSACleanup();
+	}
+}
+
+Socket::Socket(const socket_guard& sg):sockGuard(new socket_guard(sg)), host(DFLT_HOST), service(DFLT_SERVICE), protocol(DFLT_PROTOCOL), family(DFLT_FAMILY), scope(DFLT_SCOPE_ID), listening(false), timeout(0){
 	Initialize();
-/*
-	if(host.size()!=0){
-		Open();
-	}
-	if(timeout){
-		SetTimeout(tout);
-	}
-*/
+	fprintf(stderr, "Socket: %lu Created.\n",sockCount.load());
+}
+
+Socket::Socket(const std::string& host, const std::string& service, const std::string& protocol, const std::string& family,bool listening, unsigned long timeout): sockGuard(new socket_guard()), host(host), service(service), protocol(protocol), family(family), scope(DFLT_SCOPE_ID), listening(listening), timeout(timeout) {
+	Initialize();
+	fprintf(stderr, "Socket: %lu Created.\n",sockCount.load());
+}
+
+Socket::Socket(const Socket& s):sockGuard(s.sockGuard), host(s.host), service(s.service), protocol(s.protocol), family(s.family), scope(s.scope), listening(s.listening), timeout(s.timeout),udpSockStor(s.udpSockStor){
+	Initialize();
+	fprintf(stderr, "Socket: %lu Created by Copy.\n",sockCount.load());
+}
+Socket& Socket::operator = (const Socket& s){
+	sockGuard	=	s.sockGuard;
+	host		=	s.host;
+	service		=	s.service;
+	protocol	=	s.protocol;
+	family		=	s.family;
+	scope		=	s.scope;
+	listening	=	s.listening;
+	timeout		=	s.timeout;
+	udpSockStor	=	s.udpSockStor;
+	return *this;
 }
 
 Socket::~Socket(){ 
-	fprintf(stderr, "~Socket called.\n");
-//	Close();
+	fprintf(stderr, "~Socket: %lu Destructed.\n",sockCount.load());
 	Finalize();
 }
 
 bool Socket::Close(){
-	fprintf( stderr,"Socket: %d Closed.\n",sockGuard->get());
-	bool result = false;
-	if( sockGuard->get() >=0 ){
-		if( SYSCALL( "close", __LINE__, close( sockGuard->get() ) ) ) {
-			result=true;
-		}
-	}
-	sockGuard->reset();
-	return result;
+	return sockGuard->close();
 }
 
 bool Socket::SetTimeout(unsigned long tout){
@@ -99,6 +118,17 @@ bool Socket::SendTo(const std::string& buffer){
 	}  /* End WHILE there is data to send. */
 	return true;
 }
+/*
+** If this is a UDP socket, and a datagram is available.  The funny
+** thing about UDP requests is that even this server doesn't require any
+** client input; but it can't send the output unless it knows a client
+** wants the data, and the only way that can occur with UDP is if
+** the server receives a datagram from the client.  Thus, the
+** server must receive _something_, but the content of the datagram
+** is irrelevant.  Read in the datagram.  Again note the use of
+** sockaddr_storage to receive the address.
+*/
+
 bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
 	if( !SYSCALL("RecvFrom", __LINE__,  sockGuard->get() )){
 		return false;
@@ -132,29 +162,13 @@ bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
 	return true;
 }
 
-
-/*
-** Open a connection to the indicated host/service.
-**
-** Note that if all three of the following conditions are met, then the
-** scope identifier remains unresolved at this point.
-**    1) The default network interface is unknown for some reason.
-**    2) The -s option was not used on the command line.
-**    3) An IPv6 "scoped address" was not specified for the hostname on the
-**       command line.
-** If the above three conditions are met, then only an IPv4 socket can be
-** opened (connect(2) fails without the scope ID properly set for IPv6
-** sockets).
-*/
-
-int Socket::Accept () {
+socket_guard Socket::Accept () {
 	/*
 	** Determine if this is a TCP request or UDP request.
 	*/
 	if ( protocol == "tcp") {
 		/*
-		** TCP connection requested.  Accept it.  Notice the use of
-		** the sockaddr_storage data type.
+		** TCP connection requested.  Accept it.  Notice the use of the sockaddr_storage data type.
 		*/
 		struct sockaddr_storage  sockStor;
 		struct sockaddr         *sadr = (struct sockaddr*) &sockStor;
@@ -170,8 +184,8 @@ int Socket::Accept () {
 			struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
 			PrintAddrInfo(&saddri);
 		}
-		fprintf( stderr,"Socket: %d Opened.\n",newSG.get());
-		return newSG.release();
+		fprintf( stderr,"Socket id: %d Opened.\n",newSG.get());
+		return newSG;//.release();
 
 	}  /* End IF this was a TCP connection request. */
 	//	********************  Added for Socket Class ********************
@@ -185,18 +199,11 @@ int Socket::Accept () {
 * Function: Listen
 *
 * Description:
-*    Listen on a set of sockets and send the current time-of-day to any
-*    clients.  This function never returns.
+*    Listen on a socket
 *
-* Parameters:
-*    tSckt     - Array of TCP socket descriptors on which to listen.
-*    tScktSize - Size of the tSckt array (nbr of elements).
-*    uSckt     - Array of UDP socket descriptors on which to listen.
-*    uScktSize - Size of the uSckt array (nbr of elements).
-*
-* Return Value: Socket descriptors which has new activity
+* Return Value: for TCP: Socket descriptors which has new activity,for UDP: return INVALID_SOCKET
 ******************************************************************************/
-int Socket::Listen() {
+socket_guard Socket::Listen() {
 	std::vector<struct pollfd> desc;
 	int                      newSckt;
 	
@@ -235,40 +242,32 @@ int Socket::Listen() {
 		do {
 			status = poll( &desc[0], desc.size(), -1 ); /* Wait indefinitely for input. */
 		} while ( ( status < 0 ) && ( errno == EINTR ) );
-
 		if(!SYSCALL("poll", __LINE__,  status )){   /* Check for a bona fide system call error. */
 			return INVALID_SOCKET;
 		}
 
 		/*
-		** Indicate that there is new network activity.
-		*/
-		if ( verbose ) {
-			fprintf( stderr, "%s: New network activity.\n", "Socket");
-		}  /* End IF verbose. */
-
-		/*
 		** Process sockets with input available.
 		*/
 		int idx = 0;
-			switch ( desc[ idx ].revents ) {
-				case 0:        /* No activity on this socket; try the next. */
-					break;
-				case POLLIN:   /* Network activity.  Go process it.         */
-					desc[ idx ].revents = 0;   /* Clear the returned poll events. */
-					return Accept(); //desc[ idx ].fd
-					break;
+		switch ( desc[ idx ].revents ) {
+			case 0:        /* No activity on this socket; try the next. */
+				break;
+			case POLLIN:   /* Network activity.  Go process it.         */
+				desc[ idx ].revents = 0;   /* Clear the returned poll events. */
+				return Accept(); //desc[ idx ].fd
+				break;
 
-				default:       /* Invalid poll events.                      */
-					{
-						fprintf( stderr,
-							"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
-							"Socket",
-							__LINE__,
-							desc[ idx ].revents );
-						return INVALID_SOCKET;
-					}
-			}  /* End SWITCH on returned poll events. */
+			default:       /* Invalid poll events.                      */
+				{
+					fprintf( stderr,
+						"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
+						"Socket",
+						__LINE__,
+						desc[ idx ].revents );
+					return INVALID_SOCKET;
+				}
+		}  /* End SWITCH on returned poll events. */
 	}  /* End WHILE forever. */
 }  /* End tod() */
 
@@ -284,21 +283,8 @@ int Socket::Listen() {
 *    application has to open two sockets on which to listen for connections...
 *    one for IPv4 traffic and one for IPv6 traffic.
 *
-* Parameters:
-*    service  - Pointer to a character string representing the well-known port
-*               on which to listen (can be a service name or a decimal number).
-*    protocol - Pointer to a character string representing the transport layer
-*               protocol (only "tcp" or "udp" are valid).
-*    desc     - Pointer to an array into which the socket descriptors are
-*               placed when opened.
-*    descSize - This is a value-result parameter.  On input, it contains the
-*               max number of descriptors that can be put into 'desc' (i.e. the
-*               number of elements in the array).  Upon return, it will contain
-*               the number of descriptors actually opened.  Any unused slots in
-*               'desc' are set to INVALID_DESC.
-*
 * Return Value:
-*    0 on success, -1 on error.
+*    true on success, false on error.
 ******************************************************************************/
 bool Socket::OpenServer( ) {
 	fprintf(stderr, "OpenServer called.\n");
@@ -409,7 +395,6 @@ bool Socket::OpenServer( ) {
 														  IPV6_V6ONLY,
 														  &v6Only,
 														  sizeof( v6Only ) ) ) ){
-			//SYSCALL("close", __LINE__,  close( tempSock ) );
 			freeaddrinfo( aiHead );
 			return false;
 		}
@@ -435,32 +420,28 @@ bool Socket::OpenServer( ) {
                   "Socket",
                   __LINE__,
                   ai->ai_protocol == IPPROTO_TCP  ?  "TCP"  :  "UDP" );
-         //SYSCALL("close", __LINE__,  close( tempSock ) );
          continue;   /* Go to top of FOR loop w/o updating *descSize! */
 #endif /* IPV6_V6ONLY */
       }  /* End IF this is an IPv6 socket. */
+
       /*
       ** Bind the socket.  Again, the info from the addrinfo structure is used.
       */
 		if(!SYSCALL("bind", __LINE__,  bind( sg.get(), ai->ai_addr, ai->ai_addrlen ) ) ) {
-			//SYSCALL("close", __LINE__,  close( tempSock ) );
 			freeaddrinfo( aiHead );
 			return false;
 		}
+
       /*
       ** If this is a TCP socket, put the socket into passive listening mode
       ** (listen is only valid on connection-oriented sockets).
       */
 		if ( ai->ai_socktype == SOCK_STREAM ) {
 			if( !SYSCALL("listen", __LINE__,  listen( sg.get(), MAXCONNQLEN ) ) ){
-				//SYSCALL("close", __LINE__,  close( tempSock ) );
 				freeaddrinfo( aiHead );
 				return false;
 			}
 		}
-      /*
-      ** Socket set up okay.  Bump index to next descriptor array element.
-      */
 
 		*sockGuard = sg;
    }  /* End FOR each address info structure returned. */
@@ -468,7 +449,7 @@ bool Socket::OpenServer( ) {
    ** Clean up.
    */
    freeaddrinfo( aiHead );
-	fprintf( stderr,"Socket: %d Opened.\n",sockGuard->get());
+	fprintf( stderr,"Socket id: %d Opened.\n",sockGuard->get());
    return true;
 }  /* End openSckt() */
 
@@ -484,19 +465,8 @@ bool Socket::OpenServer( ) {
 *    when either a connection has been established or all records in the list
 *    have been processed.
 *
-* Parameters:
-*    host    - A pointer to a character string representing the hostname or IP
-*              address (IPv4 or IPv6) of the remote server.
-*    service - A pointer to a character string representing the service name or
-*              well-known port number.
-*    scopeId - For IPv6 sockets only.  This is the index corresponding to the
-*              network interface on which to exchange datagrams/streams.  This
-*              parameter is ignored for IPv4 sockets or when an IPv6 "scoped
-*              address" is specified in 'host' (i.e. where the colon-hex
-*              network address is augmented with the scope ID).
-*
 * Return Value:
-*    Returns the socket descriptor for the connection, or INVALID_DESC if all
+*    Returns the true for the connection, or false if all
 *    address records have been processed and a socket could not be initialized.
 ******************************************************************************/
 bool Socket::OpenClient() {
@@ -558,14 +528,24 @@ bool Socket::OpenClient() {
 		/*
 		** IPv6 kluge.  Make sure the scope ID is set.
 		*/
+		/*
+		** Note that if all three of the following conditions are met, then the
+		** scope identifier remains unresolved at this point.
+		**    1) The default network interface is unknown for some reason.
+		**    2) The -s option was not used on the command line.
+		**    3) An IPv6 "scoped address" was not specified for the hostname on the command line.
+		** If the above three conditions are met, then only an IPv4 socket can be
+		** opened (connect(2) fails without the scope ID properly set for IPv6
+		** sockets).
+		*/
 		if ( ai->ai_family == PF_INET6 ) {
-			sockaddr_in6_t  *pSadrIn6 = (sockaddr_in6_t*) ai->ai_addr;
+			struct sockaddr_in6  *pSadrIn6 = (struct sockaddr_in6*) ai->ai_addr;
 			if ( pSadrIn6->sin6_scope_id == 0 ) {
 				pSadrIn6->sin6_scope_id = if_nametoindex( scope.c_str() );
 			}  /* End IF the scope ID wasn't set. */
 		}  /* End IPv6 kluge. */
 
-		PrintAddrInfo(ai); //PrintRemoteInfo(ai);
+		PrintAddrInfo(ai);
 
 		/*
 		** Create a socket.
@@ -585,7 +565,7 @@ bool Socket::OpenClient() {
 		{
 			freeaddrinfo( aiHead );
 			*sockGuard = sg;
-			fprintf( stderr,"Socket: %d Opened.\n",sockGuard->get());
+			fprintf( stderr,"Socket id: %d Opened.\n",sockGuard->get());
 			return true;
 		}
 	}  /* End FOR each address record returned by getaddrinfo(3). */
@@ -700,136 +680,5 @@ bool Socket::PrintAddrInfo( struct addrinfo *sadr ){
 		}  /* End SWITCH on protocol family. */
 	}  /* End IF verbose mode. */
 	return true;
-}
-
-
-bool Socket::SendTCP(const std::string& buffer){
-	fprintf(stderr, "SendTCP called.\n");
-	if( !SYSCALL("SendTC", __LINE__,  sockGuard->get() )){
-		return false;
-	}
-    ssize_t wBytes = buffer.size();
-    while ( wBytes > 0 ) {
-		ssize_t count;
-		do {
-			count = write( sockGuard->get(),
-				         buffer.c_str(),
-				         wBytes );
-		} while ( ( count < 0 ) && ( errno == EINTR ) );
-		if(!SYSCALL("write", __LINE__,  count )) {   /* Check for a bona fide error. */
-			return false;
-		}
-		wBytes -= count;
-	}  /* End WHILE there is data to send. */
-	return true;
-}
-
-// Receive until the peer closes the connection or read recvbuflen bytes
-bool Socket::RecvTCP(std::string& buffer, int recvbuflen){
-	fprintf(stderr, "RecvTCP called.\n");
-	if( !SYSCALL("RecvTC", __LINE__,  sockGuard->get() )){
-		return false;
-	}
-	ssize_t inBytes;
-	do {
-		char recvbuf[DEFAULT_BUFLEN];
-		inBytes = read(sockGuard->get(), recvbuf, (recvbuflen<DEFAULT_BUFLEN)?recvbuflen:DEFAULT_BUFLEN);
-		if(inBytes > 0){
-			buffer+=std::string(recvbuf,recvbuf+inBytes);
-			recvbuflen-=inBytes;
-		}
-		else if( (inBytes < 0) && (errno != EAGAIN ) ){
-			SYSCALL("read", __LINE__,  inBytes );
-			return false;
-		}
-	} while( inBytes > 0 && recvbuflen > 0 );
-	return true;
-}
-
-/*
-** This is a UDP socket, and a datagram is available.  The funny
-** thing about UDP requests is that this server doesn't require any
-** client input; but it can't send the TOD unless it knows a client
-** wants the data, and the only way that can occur with UDP is if
-** the server receives a datagram from the client.  Thus, the
-** server must receive _something_, but the content of the datagram
-** is irrelevant.  Read in the datagram.  Again note the use of
-** sockaddr_storage to receive the address.
-*/
-
-bool Socket::SendUDP(const std::string& buffer){
-	fprintf(stderr, "SendUDP called.\n");
-	if( !SYSCALL("SendTC", __LINE__,  sockGuard->get() )){
-		return false;
-	}
-
-	struct sockaddr         *sadr;
-	socklen_t                sadrLen;
-	if(listening){
-		sadrLen = sizeof( udpSockStor );
-		sadr    = (struct sockaddr*) &udpSockStor;
-	}
-	else{
-		sadrLen = 0;
-		sadr    = NULL;
-	}
-
-    ssize_t wBytes = buffer.size();
-	ssize_t count;
-	while ( wBytes > 0 ) {
-		do {
-			count = sendto( sockGuard->get(),
-						  buffer.c_str(),
-						  wBytes,
-						  0,
-						  sadr,        /* Address & address length   */
-						  sadrLen );   /*    received in recvfrom(). */
-		} while ( ( count < 0 ) && ( errno == EINTR ) );
-		if(!SYSCALL("write", __LINE__,  count )) {   /* Check for a bona fide error. */
-			return false;
-		}
-		wBytes -= count;
-	}  /* End WHILE there is data to send. */
-	return true;
-}
-
-bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
-	fprintf(stderr, "RecvUDP called.\n");
-	if( !SYSCALL("RecvUC", __LINE__,  sockGuard->get() )){
-		return false;
-	}
-	bool result = false;
-
-	struct sockaddr         *sadr;
-	socklen_t                sadrLen;
-	if(listening){
-		fprintf(stderr, "RecvUDP listening.\n");
-		memset (&udpSockStor,0,sizeof(udpSockStor));
-		sadrLen = sizeof( udpSockStor );
-		sadr    = (struct sockaddr*) &udpSockStor;
-	}
-	else{
-		sadrLen = 0;
-		sadr    = NULL;
-	}
-	ssize_t inBytes;
-	//do {
-		std::string recvbuf;
-		recvbuf.resize(recvbuflen+1);
-		inBytes = recvfrom( sockGuard->get(), &recvbuf[0], recvbuflen, 0, sadr, &sadrLen );
-		if(inBytes > 0){
-			buffer+=std::string(recvbuf.begin(),recvbuf.begin()+inBytes);
-			recvbuflen-=inBytes;
-			result = true;
-		}
-		else if( (inBytes < 0) && (errno != EAGAIN ) ){
-			SYSCALL("recvfrom", __LINE__,  inBytes );
-		}
-	//} while( inBytes > 0 && recvbuflen > 0 );
-	if(listening){
-		struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
-		PrintAddrInfo(&saddri);
-	}
-	return result;
 }
 
