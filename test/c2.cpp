@@ -27,8 +27,7 @@ int main(int argc, char **argv) {
 	{
 		Socket c(peerName, peerPort, peerProtocol);
 		c.Open();
-		c.Close();
-
+		
 		c.SetTimeout(5*1000);
 		std::string str(" \
 		this is a test. this is a test. this is a test. this is a test. \
@@ -51,11 +50,15 @@ int main(int argc, char **argv) {
 
 		std::cout << str.size() << std::endl;
 		c.Send(str);
+		c.ShutDown(SHUT_RDWR);
 
+		sleep(2);
 		std::string res;
 		c.Recv(res,9); //9
 		//c.Close();
+
 		std::cout << res.size() << std::endl;
+		
 	}
 	return 0;
 };

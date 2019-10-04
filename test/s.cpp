@@ -6,10 +6,11 @@
 #include <vector>
 
 #include "socket.h"
-int i=0;
-void Handel(std::unique_ptr<Socket> sp){
+int connections=0;
+
+void HandelPtr(std::unique_ptr<Socket> sp){
 	sp->SetTimeout(2*1000);
-	std::cout << "\n thread: "<<i<< std::endl;
+	std::cout << "\n thread: "<<connections<< std::endl;
 	std::string res;
 	sp->Recv(res,959); //959
 	std::cout << res.size() << std::endl;
@@ -17,8 +18,18 @@ void Handel(std::unique_ptr<Socket> sp){
 	std::string str="Hi Client";
 	std::cout << str.size() << std::endl;
 	sp->Send(str);
-	//sleep(5);
-	sp->Close();
+}
+
+void Handel(Socket& sp){
+	sp.SetTimeout(2*1000);
+	std::cerr << "\n connections: "<<connections<< std::endl;
+	std::string res;
+	sp.Recv(res,959); //959
+	std::cerr << res.size() << std::endl;
+
+	std::string str="Hi Client";
+	std::cerr << str.size() << std::endl;
+	sp.Send(str);
 }
 
 int main(int argc, char **argv) {
@@ -45,28 +56,19 @@ int main(int argc, char **argv) {
 		Socket s(DFLT_HOST,hostPort,hostProtocol,hostFamily,true);
 
 		if(s.Open()){
-			while(i<1){
+			while(connections<1){
 				std::unique_ptr<Socket> sp(new Socket(s.Listen()));
 				if(*sp){
-					std::thread t( Handel,std::move(sp) );
+					std::thread t( HandelPtr,std::move(sp) );
 					t.detach(); //join detach
 				}else{
-					s.SetTimeout(2*1000);
-					std::cout << "\n No thread: "<<i<< std::endl;
-					std::string res;
-					s.Recv(res,959); //959
-					std::cout << res.size() << std::endl;
-
-					std::string str="Hi Client";
-					std::cout << str.size() << std::endl;
-					s.Send(str);
-					//break;
+					Handel(s);
 				}			
-				i++;
+				connections++;
 			};
 			sleep(5);
 		}
-		s.Close();
+		//s.Close();
 	}
 	return 0;
 };

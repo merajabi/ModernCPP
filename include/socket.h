@@ -200,6 +200,7 @@ class Socket {
 		bool Open(){ return (listening)?OpenServer():OpenClient();}
 		bool Send(const std::string& buffer){ return SendTo(buffer);}
 		bool Recv(std::string& buffer, int recvbuflen){ return RecvFrom(buffer,recvbuflen);}
+		bool ShutDown(int type);
 
 		socket_guard Listen();
 		socket_guard Accept();

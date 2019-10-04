@@ -71,6 +71,10 @@ Socket::~Socket(){
 bool Socket::Close(){
 	return sockGuard->close();
 }
+//  SHUT_RD, SHUT_WR, SHUT_RDWR have the value 0, 1, 2,
+bool Socket::ShutDown(int type){
+	return SYSCALL( "shutdown", __LINE__, ::shutdown( sockGuard->get(), type ) );
+}
 
 bool Socket::SetTimeout(unsigned long tout){
 	if( !SYSCALL("SetTimeout", __LINE__,  sockGuard->get() )){
@@ -95,7 +99,7 @@ bool Socket::SendTo(const std::string& buffer){
 
 	struct sockaddr         *sadr	 = NULL;
 	socklen_t                sadrLen = 0;
-	if(listening){
+	if(listening && protocol=="udp"){
 		sadrLen = sizeof( udpSockStor );
 		sadr    = (struct sockaddr*) &udpSockStor;
 	}
@@ -107,11 +111,12 @@ bool Socket::SendTo(const std::string& buffer){
 			count = sendto( sockGuard->get(),
 							buffer.c_str(),
 							wBytes,
-							0,
+							MSG_NOSIGNAL,
 							sadr,        /* Address & address length   */
 							sadrLen );   /*    received in recvfrom(). */
+			SYSCALL("sendto", __LINE__,  count );
 		} while ( ( count < 0 ) && ( errno == EINTR ) );
-		if(!SYSCALL("write", __LINE__,  count )) {   /* Check for a bona fide error. */
+		if(!SYSCALL("sendto", __LINE__,  count )) {   /* Check for a bona fide error. */
 			return false;
 		}
 		wBytes -= count;
