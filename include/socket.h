@@ -65,6 +65,7 @@ struct addrinfo {
 #include <time.h>         /* time(2) & ctime(3).                         */
 #include <unistd.h>       /* getopt(3), read(2), etc.                    */
 
+#include <assert.h>
 /*
 ** Constants & macros.
 */
@@ -133,18 +134,49 @@ boolean SYSCALL( const char *syscallName, int lineNbr, int status );
 
 class Select;
 
+class socket_guard {
+		mutable int sock;
+	public:
+		socket_guard(int sock=INVALID_SOCKET):sock(sock){
+		};
+		~socket_guard(){
+			if( sock != INVALID_SOCKET ) {
+				SYSCALL( "close", __LINE__, close( sock ));
+				sock = INVALID_SOCKET;
+			}
+		}
+		socket_guard& operator = (const socket_guard& sg){
+			assert(sock==INVALID_SOCKET);
+			sock=sg.sock;
+			sg.sock=INVALID_SOCKET;
+			return *this;
+		}
+		int get() const {
+			return sock;
+		}
+		int release(){
+			int tmp=sock;
+			sock = INVALID_SOCKET;
+			return tmp;
+		}
+		void reset(){
+			sock = INVALID_SOCKET;
+		}
+
+};
+
 class Socket {
 		static std::atomic<unsigned long> sockCount;
 
-		int 					sock;	// Active Socket
-		std::string				host;
-		std::string				service; // service OR port / DFLT_SERVICE
-		std::string				protocol;
-		std::string				family;
-		std::string				scope;
-		bool					listening;
-		unsigned long			timeout;
-		struct sockaddr_storage  udpSockStor;
+		std::shared_ptr<socket_guard>	sockGuard;	// Active Socket
+		std::string						host;
+		std::string						service; // service OR port / DFLT_SERVICE
+		std::string						protocol;
+		std::string						family;
+		std::string						scope;
+		bool							listening;
+		unsigned long					timeout;
+		struct sockaddr_storage			udpSockStor;
 
 		bool OpenClient();
 		bool OpenServer();
@@ -179,8 +211,8 @@ class Socket {
 		int Listen();
 		int Accept();
 
-		int GetFD() const {return sock;}
-		operator bool () const {return ( sock >= 0 );}
+		int GetFD() const {return sockGuard->get();}
+		operator bool () const {return ( sockGuard->get() >= 0 );}
 
 		friend class Select;
 
@@ -207,27 +239,7 @@ class Socket {
 
 };
 
-class socket_guard {
-		int sock;
-	public:
-		socket_guard(int sock=INVALID_SOCKET):sock(sock){
-		};
-		~socket_guard(){
-			if( sock != INVALID_SOCKET ) {
-				SYSCALL( "close", __LINE__, close( sock ));
-				sock = INVALID_SOCKET;
-			}
-		}
-		int get(){
-			return sock;
-		}
-		int release(){
-			int tmp=sock;
-			sock = INVALID_SOCKET;
-			return tmp;
-		}
-};
-
+/* I used different approach, creating a shared_ptr from socket_guard insted of bare "int sock" solved the problem :)
 class SocketGuard {
 		std::shared_ptr<unsigned long> guardCountPtr;
 		Socket socket;
@@ -253,6 +265,6 @@ class SocketGuard {
 			return socket;
 		}
 };
-
+*/
 #endif //_WIN_SOCKET_H_
 

@@ -1,4 +1,6 @@
 #include <string>
+#include <assert.h>
+
 #include "socket.h"
 
 std::atomic<unsigned long> Socket::sockCount(0);
@@ -17,11 +19,11 @@ boolean SYSCALL( const char *syscallName, int lineNbr, int status ) {
 }  /* End SYSCALL() */
 
 
-Socket::Socket(int fd,const std::string& protocol):sock(fd),host(DFLT_HOST),service(DFLT_SERVICE),protocol(protocol),family(DFLT_FAMILY),scope(DFLT_SCOPE_ID),listening(false),timeout(0){
+Socket::Socket(int fd,const std::string& protocol):sockGuard(new socket_guard(fd)), host(DFLT_HOST), service(DFLT_SERVICE), protocol(protocol), family(DFLT_FAMILY), scope(DFLT_SCOPE_ID), listening(false), timeout(0){
 	Initialize();
 }
 
-Socket::Socket(const std::string& pH, const std::string& pP, const std::string& proto, const std::string& family,bool listening, unsigned long tout): sock(INVALID_SOCKET),host(pH),service(pP),protocol(proto),family(family),scope(DFLT_SCOPE_ID),listening(listening),timeout(tout) {
+Socket::Socket(const std::string& pH, const std::string& pP, const std::string& proto, const std::string& family,bool listening, unsigned long tout): sockGuard(new socket_guard()), host(pH), service(pP), protocol(proto), family(family), scope(DFLT_SCOPE_ID), listening(listening), timeout(tout) {
 	Initialize();
 /*
 	if(host.size()!=0){
@@ -40,19 +42,19 @@ Socket::~Socket(){
 }
 
 bool Socket::Close(){
-	fprintf( stderr,"Socket: %d Closed.\n",sock);
+	fprintf( stderr,"Socket: %d Closed.\n",sockGuard->get());
 	bool result = false;
-	if( sock >=0 ){
-		if( SYSCALL( "close", __LINE__, close( sock ) ) ) {
+	if( sockGuard->get() >=0 ){
+		if( SYSCALL( "close", __LINE__, close( sockGuard->get() ) ) ) {
 			result=true;
 		}
 	}
-	sock=INVALID_SOCKET;
+	sockGuard->reset();
 	return result;
 }
 
 bool Socket::SetTimeout(unsigned long tout){
-	if( !SYSCALL("SetTimeout", __LINE__,  sock )){
+	if( !SYSCALL("SetTimeout", __LINE__,  sockGuard->get() )){
 		return false;
 	}
 
@@ -61,14 +63,14 @@ bool Socket::SetTimeout(unsigned long tout){
 	tv.tv_sec = static_cast<int>(timeout/1000);
 	tv.tv_usec = static_cast<int>(0);
 
-	if( !SYSCALL("setsockopt", __LINE__,  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv)) )){
+	if( !SYSCALL("setsockopt", __LINE__,  setsockopt(sockGuard->get(), SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv)) )){
 		return false;
 	}
 	return true;
 }
 
 bool Socket::SendTo(const std::string& buffer){
-	if( !SYSCALL("SendTo", __LINE__,  sock )){
+	if( !SYSCALL("SendTo", __LINE__,  sockGuard->get() )){
 		return false;
 	}
 
@@ -83,7 +85,7 @@ bool Socket::SendTo(const std::string& buffer){
 	while ( wBytes > 0 ) {
 		ssize_t count;
 		do {
-			count = sendto( sock,
+			count = sendto( sockGuard->get(),
 							buffer.c_str(),
 							wBytes,
 							0,
@@ -98,7 +100,7 @@ bool Socket::SendTo(const std::string& buffer){
 	return true;
 }
 bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
-	if( !SYSCALL("RecvFrom", __LINE__,  sock )){
+	if( !SYSCALL("RecvFrom", __LINE__,  sockGuard->get() )){
 		return false;
 	}
 
@@ -113,7 +115,7 @@ bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
 	do {
 		std::string recvbuf;
 		recvbuf.resize(recvbuflen+1);
-		inBytes = recvfrom( sock, &recvbuf[0], recvbuflen, 0, sadr, &sadrLen );
+		inBytes = recvfrom( sockGuard->get(), &recvbuf[0], recvbuflen, 0, sadr, &sadrLen );
 		if(inBytes > 0){
 			buffer+=std::string(recvbuf.begin(),recvbuf.begin()+inBytes);
 			recvbuflen-=inBytes;
@@ -158,7 +160,7 @@ int Socket::Accept () {
 		struct sockaddr         *sadr = (struct sockaddr*) &sockStor;
 		socklen_t                sadrLen = sizeof( sockStor );
 
-		socket_guard newSG( accept( sock, sadr, &sadrLen ) );
+		socket_guard newSG( accept( sockGuard->get(), sadr, &sadrLen ) );
 
 		if(!SYSCALL("accept", __LINE__, newSG.get() ) ) {
 			return INVALID_SOCKET;
@@ -198,7 +200,7 @@ int Socket::Listen() {
 	std::vector<struct pollfd> desc;
 	int                      newSckt;
 	
-	if( sock < 0 ) { // Socket not open
+	if( sockGuard->get() < 0 ) { // Socket not open
          fprintf( stderr,
                   "%s (line %d): ERROR - Socket: Socket not open ",
                   "Socket",
@@ -212,7 +214,7 @@ int Socket::Listen() {
 	*/
 	{
 		struct pollfd pfd;
-		pfd.fd      = sock;
+		pfd.fd      = sockGuard->get();
 		pfd.events  = POLLIN;
 		pfd.revents = 0;
 		desc.push_back(pfd);
@@ -305,12 +307,12 @@ bool Socket::OpenServer( ) {
    struct addrinfo  hints    = { .ai_flags  = AI_PASSIVE };   // Server mode.
 //                                 .ai_family = PF_UNSPEC };   // IPv4 or IPv6.
 
-	if( sock != INVALID_SOCKET ) { // Socket already open
+	if( sockGuard->get() != INVALID_SOCKET ) { // Socket already open
          fprintf( stderr,
                   "%s (line %d): ERROR - Socket: %d already open ",
                   "Socket",
                   __LINE__,
-                  sock );
+                  sockGuard->get() );
 
 		return false;
 	}
@@ -460,13 +462,13 @@ bool Socket::OpenServer( ) {
       ** Socket set up okay.  Bump index to next descriptor array element.
       */
 
-		sock = sg.release();
+		*sockGuard = sg;
    }  /* End FOR each address info structure returned. */
    /*
    ** Clean up.
    */
    freeaddrinfo( aiHead );
-	fprintf( stderr,"Socket: %d Opened.\n",sock);
+	fprintf( stderr,"Socket: %d Opened.\n",sockGuard->get());
    return true;
 }  /* End openSckt() */
 
@@ -503,12 +505,12 @@ bool Socket::OpenClient() {
 	struct addrinfo *aiHead;
 	struct addrinfo  hints;
 
-	if( sock != INVALID_SOCKET ) { // Socket already open
+	if( sockGuard->get() != INVALID_SOCKET ) { // Socket already open
          fprintf( stderr,
                   "%s (line %d): ERROR - Socket: %d already open ",
                   "Socket",
                   __LINE__,
-                  sock );
+                  sockGuard->get() );
 
 		return false;
 	}
@@ -582,8 +584,8 @@ bool Socket::OpenClient() {
 						connect( sg.get(), ai->ai_addr, ai->ai_addrlen ) ) )
 		{
 			freeaddrinfo( aiHead );
-			sock = sg.release();
-			fprintf( stderr,"Socket: %d Opened.\n",sock);
+			*sockGuard = sg;
+			fprintf( stderr,"Socket: %d Opened.\n",sockGuard->get());
 			return true;
 		}
 	}  /* End FOR each address record returned by getaddrinfo(3). */
@@ -703,14 +705,14 @@ bool Socket::PrintAddrInfo( struct addrinfo *sadr ){
 
 bool Socket::SendTCP(const std::string& buffer){
 	fprintf(stderr, "SendTCP called.\n");
-	if( !SYSCALL("SendTC", __LINE__,  sock )){
+	if( !SYSCALL("SendTC", __LINE__,  sockGuard->get() )){
 		return false;
 	}
     ssize_t wBytes = buffer.size();
     while ( wBytes > 0 ) {
 		ssize_t count;
 		do {
-			count = write( sock,
+			count = write( sockGuard->get(),
 				         buffer.c_str(),
 				         wBytes );
 		} while ( ( count < 0 ) && ( errno == EINTR ) );
@@ -725,13 +727,13 @@ bool Socket::SendTCP(const std::string& buffer){
 // Receive until the peer closes the connection or read recvbuflen bytes
 bool Socket::RecvTCP(std::string& buffer, int recvbuflen){
 	fprintf(stderr, "RecvTCP called.\n");
-	if( !SYSCALL("RecvTC", __LINE__,  sock )){
+	if( !SYSCALL("RecvTC", __LINE__,  sockGuard->get() )){
 		return false;
 	}
 	ssize_t inBytes;
 	do {
 		char recvbuf[DEFAULT_BUFLEN];
-		inBytes = read(sock, recvbuf, (recvbuflen<DEFAULT_BUFLEN)?recvbuflen:DEFAULT_BUFLEN);
+		inBytes = read(sockGuard->get(), recvbuf, (recvbuflen<DEFAULT_BUFLEN)?recvbuflen:DEFAULT_BUFLEN);
 		if(inBytes > 0){
 			buffer+=std::string(recvbuf,recvbuf+inBytes);
 			recvbuflen-=inBytes;
@@ -757,7 +759,7 @@ bool Socket::RecvTCP(std::string& buffer, int recvbuflen){
 
 bool Socket::SendUDP(const std::string& buffer){
 	fprintf(stderr, "SendUDP called.\n");
-	if( !SYSCALL("SendTC", __LINE__,  sock )){
+	if( !SYSCALL("SendTC", __LINE__,  sockGuard->get() )){
 		return false;
 	}
 
@@ -776,7 +778,7 @@ bool Socket::SendUDP(const std::string& buffer){
 	ssize_t count;
 	while ( wBytes > 0 ) {
 		do {
-			count = sendto( sock,
+			count = sendto( sockGuard->get(),
 						  buffer.c_str(),
 						  wBytes,
 						  0,
@@ -793,7 +795,7 @@ bool Socket::SendUDP(const std::string& buffer){
 
 bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
 	fprintf(stderr, "RecvUDP called.\n");
-	if( !SYSCALL("RecvUC", __LINE__,  sock )){
+	if( !SYSCALL("RecvUC", __LINE__,  sockGuard->get() )){
 		return false;
 	}
 	bool result = false;
@@ -814,7 +816,7 @@ bool Socket::RecvUDP(std::string& buffer, int recvbuflen) {
 	//do {
 		std::string recvbuf;
 		recvbuf.resize(recvbuflen+1);
-		inBytes = recvfrom( sock, &recvbuf[0], recvbuflen, 0, sadr, &sadrLen );
+		inBytes = recvfrom( sockGuard->get(), &recvbuf[0], recvbuflen, 0, sadr, &sadrLen );
 		if(inBytes > 0){
 			buffer+=std::string(recvbuf.begin(),recvbuf.begin()+inBytes);
 			recvbuflen-=inBytes;

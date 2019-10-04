@@ -23,7 +23,7 @@ bool Select::Listen(std::vector<Socket>& selected){
 	*/
 	for ( int idx = 0;     idx < scktList.size();     idx++ ) {
 		struct pollfd pfd;
-		pfd.fd      = scktList[ idx ].sock;
+		pfd.fd      = scktList[ idx ].GetFD();
 		pfd.events  = POLLIN;
 		pfd.revents = 0;
 		desc.push_back(pfd);

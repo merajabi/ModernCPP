@@ -23,18 +23,20 @@ namespace ModernCPP {
 				xPtr=pg.xPtr;
 				pg.xPtr=nullptr;
 			}
-			unique_ptr& operator= (const unique_ptr &pg){
-				xPtr=pg.xPtr;
-				pg.xPtr=nullptr;
-				return *this;
-			}
 			template<typename U>
 			unique_ptr(const unique_ptr<U> &pg){
 				xPtr=pg.xPtr;
 				pg.xPtr=nullptr;
 			}
+			unique_ptr& operator= (const unique_ptr &pg){
+				assert(xPtr==nullptr);
+				xPtr=pg.xPtr;
+				pg.xPtr=nullptr;
+				return *this;
+			}
 			template<typename U>
 			unique_ptr& operator= (const unique_ptr<U> &pg){
+				assert(xPtr==nullptr);
 				xPtr=pg.xPtr;
 				pg.xPtr=nullptr;
 				return *this;
