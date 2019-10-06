@@ -5,12 +5,27 @@
 #include <string>
 #include <vector>
 #include <signal.h>
+#include <chrono>
 
 #include "socket.h"
 #include "select.h"
 
-int connections=0;
-
+bool Recv(Socket& c){
+	bool result;
+	std::string recvStr;
+	result = c.Recv(recvStr,50);
+	std::cout << GetDateTimeStr() << " Recv: " << recvStr.size() << ((result)?" OK":" NOK") << std::endl;
+	//sleep(2);
+	return result;
+}
+bool Send(Socket& c){
+	bool result;
+	std::string sendStr(50,'x');
+	result = c.Send(sendStr);
+	std::cout << GetDateTimeStr() << " Send: "  << sendStr.size() << ((result)?" OK":" NOK") << std::endl;
+	//sleep(2);
+	return result;
+}
 int main(int argc, char **argv) {
 
 	Socket::verbose = true;
@@ -19,15 +34,21 @@ int main(int argc, char **argv) {
 	std::string recvStr;
 	std::string sendStr(50,'x');
 
+	std::time_t start;
+	std::time_t now;
+
 	{
-		Socket s1(DFLT_HOST,"8888","tcp","ipv4",true);
+		Socket s1(DFLT_HOST,"9999","tcp","ipv4",true);
 		s1.Open();
 		pool.Add(s1);
 	}
 	{
+		int state=0;
 		std::vector<Socket> selected;
 		while( pool.Listen(selected) ){//connections<4 && 
-			std::cerr << "\nNew network activity.\n" << std::endl;
+			now=std::time(nullptr);
+			std::cerr << "\nNew network activity: " << now << std::endl;
+
 			for(int i=0; i < selected.size(); i++ ){
 				std::cerr << "Processing Socket: " << selected[i].GetFD() << std::endl << std::endl;
 				if( selected[i].Listening() && selected[i].Protocol()=="tcp"){
@@ -35,27 +56,28 @@ int main(int argc, char **argv) {
 					if(sp){
 						//sp.SetTimeout(2*1000);
 						pool.Add(sp);
-						connections=0;
+						start=now;
+						state=0;
 					}
 				}else{
 					if( !selected[i].Listening() && selected[i].Protocol()=="tcp"){
-						std::cerr << "connections: " << connections << std::endl;
-						if(connections==0){
-							selected[i].Recv(recvStr,50);
-							std::cout << "Recv: " << recvStr.size() << std::endl;
+						std::cerr << "state: " << state << std::endl;
+						if( (selected[i].GetEvent() & POLLIN) && (now-start>1) && (state == 0) ){
+							Recv(selected[i]);
+							state++;
 						}
-						else if(connections==1){
-							selected[i].Send(sendStr);
-							std::cout << "Send: " << sendStr.size() << std::endl;
+						else if( (selected[i].GetEvent() & POLLOUT) && (now-start>2) && (state == 1) ){
+							Send(selected[i]);
+							state++;
 						}
-						else if(connections==3){
-							selected[i].Send(sendStr);
-							std::cout << "Send: " << sendStr.size() << std::endl;
+						else if( (selected[i].GetEvent() & POLLOUT) && (now-start>3) && (state == 2) ){
+							Send(selected[i]);
+							state++;
 						}
-						else if(connections==5){
+						else if((now-start>4) && (state == 3) ){
 							pool.Remove(selected[i]);
+							state++;
 						}
-						connections++;
 					}
 				}			
 			};

@@ -1,4 +1,5 @@
-
+#include <ctime>
+#include <chrono>
 #include "select.h"
 
 /*
@@ -32,6 +33,7 @@ bool Select::Remove(const Socket& s){
 }
 
 bool Select::Listen(std::vector<Socket>& selected){
+	std::cerr << "@ Listen Begin: " <<std::endl;
 	if(!descVec.size()){
 		return false;
 	}
@@ -57,31 +59,7 @@ bool Select::Listen(std::vector<Socket>& selected){
 		** Process sockets with input available.
 		*/
 		for ( int idx = 0;     idx < descVec.size();     idx++ ) {
-			fprintf( stderr,"\n ******************** \n");
-			fprintf( stderr," Socket %d events start.\n",descVec[ idx ].fd);
-			if( descVec[ idx ].revents & POLLIN ) {
-				fprintf( stderr," POLLIN event (0x%02X).\n",POLLIN);
-			}
-			if( descVec[ idx ].revents & POLLPRI ) {
-				fprintf( stderr," POLLPRI event (0x%02X).\n",POLLPRI);
-			}
-			if( descVec[ idx ].revents & POLLOUT ) {
-				fprintf( stderr," POLLOUT event (0x%02X).\n",POLLOUT);
-			}
-			if( descVec[ idx ].revents & POLLRDHUP ) {
-				fprintf( stderr," POLLRDHUP event (0x%02X).\n",POLLRDHUP);
-			}
-			if( descVec[ idx ].revents & POLLERR ) {
-				fprintf( stderr," POLLERR event (0x%02X).\n",POLLERR);
-			}
-			if( descVec[ idx ].revents & POLLHUP ) {
-				fprintf( stderr," POLLHUP event (0x%02X).\n",POLLHUP);
-			}
-			if( descVec[ idx ].revents & POLLNVAL ) {
-				fprintf( stderr," POLLNVAL event (0x%02X).\n",POLLNVAL);
-			}
-			fprintf( stderr," Socket %d events end.\n",descVec[ idx ].fd);
-			fprintf( stderr," ******************** \n\n");
+			sockMap[ descVec[ idx ].fd ].SetEvent(descVec[ idx ].revents);
 			switch ( descVec[ idx ].revents ) {
 				case 0:        /* No activity on this socket; try the next. */
 					continue;

@@ -122,18 +122,23 @@ typedef int SOCKET;
 
 bool SYSCALL( const std::string& syscallName, int lineNbr, int status );
 
+void GetDateTime(std::string& dateStr,std::string& timeStr, std::string& msStr, const std::string& datePattern = std::string("%Y/%m/%d"), const std::string& timePattern = std::string("%H:%M:%S"));
+std::string GetDateTimeStr();
+
 class socket_guard {
 		mutable int sock;
+		int event;
 	public:
-		socket_guard(int sock=INVALID_SOCKET):sock(sock){
+		socket_guard(int sock=INVALID_SOCKET):sock(sock),event(0){
 		};
-		socket_guard(const socket_guard& sg):sock(sg.sock){
+		socket_guard(const socket_guard& sg):sock(sg.sock),event(0){
 			sg.sock=INVALID_SOCKET;
 		}
 		socket_guard& operator = (const socket_guard& sg){
 			assert(sock==INVALID_SOCKET);
 			sock=sg.sock;
 			sg.sock=INVALID_SOCKET;
+			event=sg.event;
 			return *this;
 		}
 		~socket_guard(){
@@ -159,6 +164,8 @@ class socket_guard {
 		void reset(){
 			sock = INVALID_SOCKET;
 		}
+		int GetEvent(){return event;}
+		void SetEvent(int e){event=e;}
 };
 
 class Socket {
@@ -209,6 +216,8 @@ class Socket {
 		bool SetTimeout(unsigned long tout);
 		bool Listening() const {return listening;}
 		const std::string& Protocol() const {return protocol;}
+		int GetEvent(){return sockGuard->GetEvent();}
+		void SetEvent(int e);//{sockGuard->SetEvent(e);}
 		operator bool () const {return ( sockGuard->get() >= 0 );}
 };
 

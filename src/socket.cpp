@@ -1,9 +1,16 @@
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <ctime>
 #include "socket.h"
 
 std::atomic<unsigned long> Socket::sockCount(0);
 bool     Socket::verbose = false;         /* Verbose mode indication.     */
 
 bool SYSCALL( const std::string& syscallName, int lineNbr, int status ) {
+	if(Socket::verbose){
+		std::cerr << GetDateTimeStr() << " " << syscallName  << " System call " << ((status == -1)?"failed":"success") << " line: " << lineNbr << std::endl;
+	}
    if ( ( status == -1 ) && Socket::verbose ) {
       fprintf( stderr,
                "%s (line %d): System call failed ('%s') - %s.\n",
@@ -14,6 +21,40 @@ bool SYSCALL( const std::string& syscallName, int lineNbr, int status ) {
    }
    return (status != -1);   /* True if the system call was successful. */
 }  /* End SYSCALL() */
+
+std::string GetDateTimeStr(){
+	std::string dateStr;
+	std::string timeStr;
+	std::string msStr;
+	GetDateTime(dateStr,timeStr,msStr);
+	return dateStr+" "+timeStr+"."+msStr;
+}
+void GetDateTime(std::string& dateStr,std::string& timeStr, std::string& msStr,
+		const std::string& datePattern, const std::string& timePattern){
+	std::locale loc;//"en_US.utf8"
+    std::cout.imbue(loc);
+	const std::time_put<char>& tmput = std::use_facet <std::time_put<char> > (loc);
+
+	std::time_t t;
+	time(&t);
+    std::tm tm = *std::localtime(&t);
+
+	//std::string datePattern ("%Y/%m/%d");
+    std::stringstream dateSS;
+	tmput.put (dateSS, dateSS, ' ', &tm, datePattern.data(), datePattern.data()+datePattern.length());
+
+	//std::string timePattern ("%H:%M:%S");
+    std::stringstream timeSS;
+	tmput.put (timeSS, timeSS, ' ', &tm, timePattern.data(), timePattern.data()+timePattern.length());
+
+	dateStr=dateSS.str();
+	timeStr=timeSS.str();
+
+    std::stringstream msSS;
+	auto ms=std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+	msSS << (ms.count()%1000000);
+	msStr=msSS.str();
+}
 
 bool Socket::Initialize(){
 	if( 0 == sockCount++ ){
@@ -685,4 +726,31 @@ bool Socket::PrintAddrInfo( struct addrinfo *sadr ){
 	}  /* End IF verbose mode. */
 	return true;
 }
-
+void Socket::SetEvent(int e){
+	sockGuard->SetEvent(e);
+	fprintf( stderr,"\n ******************** \n");
+	fprintf( stderr," Socket %d events start.\n",sockGuard->get());
+	if( e & POLLIN ) {
+		fprintf( stderr," POLLIN event (0x%02X).\n",POLLIN);
+	}
+	if( e & POLLPRI ) {
+		fprintf( stderr," POLLPRI event (0x%02X).\n",POLLPRI);
+	}
+	if( e & POLLOUT ) {
+		fprintf( stderr," POLLOUT event (0x%02X).\n",POLLOUT);
+	}
+	if( e & POLLRDHUP ) {
+		fprintf( stderr," POLLRDHUP event (0x%02X).\n",POLLRDHUP);
+	}
+	if( e & POLLERR ) {
+		fprintf( stderr," POLLERR event (0x%02X).\n",POLLERR);
+	}
+	if( e & POLLHUP ) {
+		fprintf( stderr," POLLHUP event (0x%02X).\n",POLLHUP);
+	}
+	if( e & POLLNVAL ) {
+		fprintf( stderr," POLLNVAL event (0x%02X).\n",POLLNVAL);
+	}
+	fprintf( stderr," Socket %d events end.\n",sockGuard->get());
+	fprintf( stderr," ******************** \n\n");
+}
