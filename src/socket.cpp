@@ -108,17 +108,50 @@ bool Socket::SendTo(const std::string& buffer){
 	while ( wBytes > 0 ) {
 		ssize_t count;
 		do {
+			{
+				ssize_t		inBytes;
+				ssize_t		recvbuflen = 10;
+				std::string recvbuf;
+				recvbuf.resize(recvbuflen+1);
+				//do {
+					inBytes = recvfrom( sockGuard->get(), &recvbuf[0], recvbuflen, MSG_DONTWAIT | MSG_PEEK , sadr, &sadrLen );
+				//} while( inBytes <= 0 && (errno == EAGAIN || errno == EWOULDBLOCK) );
+				if(inBytes == 0){
+					fprintf(stderr, "Exception SendTo recvfrom inBytes == 0 \n");
+				}					
+				else if ( inBytes < 0 && (errno != EAGAIN && errno != EWOULDBLOCK) ){
+					SYSCALL("Exception SendTo recvfrom", __LINE__,  inBytes );
+					return false;
+				}
+			}
 			count = sendto( sockGuard->get(),
 							buffer.c_str(),
 							wBytes,
-							MSG_NOSIGNAL,
+							MSG_NOSIGNAL, //MSG_NOSIGNAL
 							sadr,        /* Address & address length   */
 							sadrLen );   /*    received in recvfrom(). */
-			SYSCALL("sendto", __LINE__,  count );
+
 		} while ( ( count < 0 ) && ( errno == EINTR ) );
 		if(!SYSCALL("sendto", __LINE__,  count )) {   /* Check for a bona fide error. */
 			return false;
 		}
+		{
+			ssize_t		inBytes;
+			ssize_t		recvbuflen = 10;
+			std::string recvbuf;
+			recvbuf.resize(recvbuflen+1);
+			//do {
+				inBytes = recvfrom( sockGuard->get(), &recvbuf[0], recvbuflen, MSG_DONTWAIT | MSG_PEEK , sadr, &sadrLen );
+			//} while( inBytes <= 0 && (errno == EAGAIN || errno == EWOULDBLOCK) );
+			if(inBytes == 0){
+				fprintf(stderr, "Exception SendTo recvfrom inBytes == 0 \n");
+			}					
+			else if ( inBytes < 0 && (errno != EAGAIN && errno != EWOULDBLOCK) ){
+				SYSCALL("Exception SendTo recvfrom", __LINE__,  inBytes );
+				return false;
+			}
+		}
+
 		wBytes -= count;
 	}  /* End WHILE there is data to send. */
 	return true;
@@ -152,12 +185,19 @@ bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
 		recvbuf.resize(recvbuflen+1);
 		inBytes = recvfrom( sockGuard->get(), &recvbuf[0], recvbuflen, 0, sadr, &sadrLen );
 		if(inBytes > 0){
+			fprintf(stderr, "RecvFrom inBytes == %ld \n",inBytes);
 			buffer+=std::string(recvbuf.begin(),recvbuf.begin()+inBytes);
 			recvbuflen-=inBytes;
 		}
-		else if( (inBytes < 0) && (errno != EAGAIN ) ){
+		else if( inBytes == 0 ){
+			fprintf(stderr, "Exception RecvFrom inBytes == 0 \n");
+		}
+		else if( (inBytes < 0) && (errno != EAGAIN && errno != EWOULDBLOCK) ){//(errno != EAGAIN && errno != EWOULDBLOCK)
 			SYSCALL("recvfrom", __LINE__,  inBytes );
 			return false;
+		}
+		else {
+			SYSCALL("recvfrom timeout", __LINE__,  inBytes );
 		}
 	} while( inBytes > 0 && recvbuflen > 0 && protocol=="tcp" );
 	if(listening && protocol=="udp"){

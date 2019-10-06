@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
 	}
 	{
 		std::vector<Socket> selected;
-		while( pool.Listen(selected) ){//connections<4 && 
+		while( connections<4 && pool.Listen(selected) ){// && 
 			std::cerr << "\nNew network activity.\n" << std::endl;
 			for(int i=0; i < selected.size(); i++ ){
 				/*std::unique_ptr<Socket> sp( new Socket(selected[i].Accept()) );

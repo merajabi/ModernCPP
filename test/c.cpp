@@ -27,7 +27,6 @@ int main(int argc, char **argv) {
 	{
 		Socket c(peerName, peerPort, peerProtocol);
 		c.Open();
-		c.Close();
 
 		c.SetTimeout(5*1000);
 		std::string str(" \
