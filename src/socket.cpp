@@ -114,7 +114,6 @@ bool Socket::SendTo(const std::string& buffer){
 							MSG_NOSIGNAL,
 							sadr,        /* Address & address length   */
 							sadrLen );   /*    received in recvfrom(). */
-			SYSCALL("sendto", __LINE__,  count );
 		} while ( ( count < 0 ) && ( errno == EINTR ) );
 		if(!SYSCALL("sendto", __LINE__,  count )) {   /* Check for a bona fide error. */
 			return false;

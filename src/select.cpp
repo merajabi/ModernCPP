@@ -9,7 +9,7 @@ bool Select::Add(const Socket& s){
 		{
 			struct pollfd pfd;
 			pfd.fd      = s.GetFD();
-			pfd.events  = POLLIN;
+			pfd.events  = POLLIN | POLLPRI | POLLOUT | POLLRDHUP ;
 			pfd.revents = 0;
 			descVec.push_back(pfd);
 		}
@@ -57,24 +57,52 @@ bool Select::Listen(std::vector<Socket>& selected){
 		** Process sockets with input available.
 		*/
 		for ( int idx = 0;     idx < descVec.size();     idx++ ) {
+			fprintf( stderr,"\n ******************** \n");
+			fprintf( stderr," Socket %d events start.\n",descVec[ idx ].fd);
+			if( descVec[ idx ].revents & POLLIN ) {
+				fprintf( stderr," POLLIN event (0x%02X).\n",POLLIN);
+			}
+			if( descVec[ idx ].revents & POLLPRI ) {
+				fprintf( stderr," POLLPRI event (0x%02X).\n",POLLPRI);
+			}
+			if( descVec[ idx ].revents & POLLOUT ) {
+				fprintf( stderr," POLLOUT event (0x%02X).\n",POLLOUT);
+			}
+			if( descVec[ idx ].revents & POLLRDHUP ) {
+				fprintf( stderr," POLLRDHUP event (0x%02X).\n",POLLRDHUP);
+			}
+			if( descVec[ idx ].revents & POLLERR ) {
+				fprintf( stderr," POLLERR event (0x%02X).\n",POLLERR);
+			}
+			if( descVec[ idx ].revents & POLLHUP ) {
+				fprintf( stderr," POLLHUP event (0x%02X).\n",POLLHUP);
+			}
+			if( descVec[ idx ].revents & POLLNVAL ) {
+				fprintf( stderr," POLLNVAL event (0x%02X).\n",POLLNVAL);
+			}
+			fprintf( stderr," Socket %d events end.\n",descVec[ idx ].fd);
+			fprintf( stderr," ******************** \n\n");
 			switch ( descVec[ idx ].revents ) {
 				case 0:        /* No activity on this socket; try the next. */
 					continue;
 				case POLLIN:   /* Network activity.  Go process it.         */
-					descVec[ idx ].revents = 0;   /* Clear the returned poll events. */
 					selected.push_back( sockMap[ descVec[ idx ].fd ] );
 					activity = true;
 					break;
 				default:       /* Invalid poll events.                      */
 					{
-						fprintf( stderr,
-							"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
-							"Select",
-							__LINE__,
-							descVec[ idx ].revents );
-						return false;
+						//fprintf( stderr,
+						//	"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
+						//	"Select",
+						//	__LINE__,
+						//	descVec[ idx ].revents );
+						//return false;
+						selected.push_back( sockMap[ descVec[ idx ].fd ] );
+						activity = true;
+						break;
 					}
 			}  /* End SWITCH on returned poll events. */
+			descVec[ idx ].revents = 0;   /* Clear the returned poll events. */
 		}  /* End FOR each socket descriptor. */
 	}while(!activity);  /* End WHILE forever. */
 	return activity;

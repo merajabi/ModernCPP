@@ -1,0 +1,60 @@
+Socket: 1 Created.
+OpenServer called.
+Address info (PrintAddrInfo):
+   ai_flags     = 0x01
+   ai_family    = 2 (PF_INET = 2, PF_INET6 = 10)
+   ai_socktype  = 1 (SOCK_STREAM = 1, SOCK_DGRAM = 2)
+   ai_protocol  = 6 (IPPROTO_TCP = 6, IPPROTO_UDP = 17)
+   ai_addrlen   = 16 (sockaddr_in = 16, sockaddr_in6 = 28)
+   sin_addr  = sin_family: 2
+               sin_addr:   0.0.0.0
+               sin_port:   9999
+Socket id: -1 Closed.
+Socket id: 3 Opened.
+Socket: 2 Created by Copy.
+Socket: 3 Created by Copy.
+~Socket: 3 Destructed.
+~Socket: 2 Destructed.
+ Socket 3 events start.
+ POLLIN event (0x01).
+ Socket 3 events end.
+ ******************** 
+
+Socket: 2 Created by Copy.
+
+New network activity.
+
+Address info (PrintAddrInfo):
+   ai_flags     = 0x00
+   ai_family    = 2 (PF_INET = 2, PF_INET6 = 10)
+   ai_socktype  = 0 (SOCK_STREAM = 1, SOCK_DGRAM = 2)
+   ai_protocol  = 0 (IPPROTO_TCP = 6, IPPROTO_UDP = 17)
+   ai_addrlen   = 16 (sockaddr_in = 16, sockaddr_in6 = 28)
+   sin_addr  = sin_family: 2
+               sin_addr:   127.0.0.1
+               sin_port:   42758
+Socket id: 4 Opened.
+Socket id: -1 Closed.
+Socket: 3 Created.
+Socket id: -1 Closed.
+Socket: 4 Created by Copy.
+Socket: 5 Created by Copy.
+~Socket: 5 Destructed.
+~Socket: 4 Destructed.
+~Socket: 3 Destructed.
+ Socket 3 events start.
+ Socket 3 events end.
+ ******************** 
+
+ Socket 4 events start.
+ POLLIN event (0x01).
+ Socket 4 events end.
+ ******************** 
+
+Socket: 3 Created by Copy.
+
+New network activity.
+
+connections: 0
+50
+~Socket: 3 Destructed.
