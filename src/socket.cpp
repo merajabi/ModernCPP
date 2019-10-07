@@ -22,12 +22,27 @@ bool SYSCALL( const std::string& syscallName, int lineNbr, int status ) {
    return (status != -1);   /* True if the system call was successful. */
 }  /* End SYSCALL() */
 
+uint64_t get_ss(){
+	// std::chrono::milliseconds
+	// std::chrono::microseconds
+	// std::chrono::nanoseconds
+
+    // typedef std::ratio<1l, 1000000000000l> pico;
+    // typedef std::chrono::duration<long long, pico> picoseconds;
+	// auto ms=std::chrono::duration_cast<picoseconds>(std::chrono::system_clock::now().time_since_epoch());
+
+	auto ms=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch());
+	return ms.count();
+}
+
 std::string GetDateTimeStr(){
+    std::stringstream ss;
 	std::string dateStr;
 	std::string timeStr;
 	std::string msStr;
 	GetDateTime(dateStr,timeStr,msStr);
-	return dateStr+" "+timeStr+"."+msStr;
+	ss <<timeStr<<" "<<get_ss()%1000000000;
+	return ss.str();
 }
 void GetDateTime(std::string& dateStr,std::string& timeStr, std::string& msStr,
 		const std::string& datePattern, const std::string& timePattern){
@@ -51,8 +66,7 @@ void GetDateTime(std::string& dateStr,std::string& timeStr, std::string& msStr,
 	timeStr=timeSS.str();
 
     std::stringstream msSS;
-	auto ms=std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-	msSS << (ms.count()%1000000);
+	msSS << (get_ss()%1000000);
 	msStr=msSS.str();
 }
 
@@ -110,15 +124,48 @@ Socket::~Socket(){
 }
 
 bool Socket::Close(){
-	return sockGuard->close();
+	bool result = sockGuard->close();
+	if(sockGuard->get_status() == socket_guard::ERR){
+		fprintf( stderr,
+                  "%s (line %d): ERROR - Send Recv \n",
+                  "Socket",
+                  __LINE__);
+		result = false;
+	}
+	return result;
 }
 //  SHUT_RD, SHUT_WR, SHUT_RDWR have the value 0, 1, 2,
 bool Socket::ShutDown(int type){
+	if( !(*sockGuard) ){
+         fprintf( stderr,
+                  "%s (line %d): ERROR - Socket: Socket not open ",
+                  "Socket",
+                  __LINE__);
+		return false;
+	}
+	/*if(type == SHUT_RD) {
+		sockGuard->set_status(NORD);
+	}else if(type == SHUT_WR){
+		sockGuard->set_status(NOWR);
+	}else if(type == SHUT_RDWR){
+		sockGuard->set_status(NORW);
+	}*/
+	if(type>=SHUT_RD && type <= SHUT_RDWR){
+		sockGuard->set_status(static_cast<socket_guard::socket_status>(type+1));
+	}
+	else{
+		fprintf( stderr,"Invalid ShutDown type %d\n", type);
+		return false;
+	}
 	return SYSCALL( "shutdown", __LINE__, ::shutdown( sockGuard->get(), type ) );
 }
 
 bool Socket::SetTimeout(unsigned long tout){
-	if( !SYSCALL("SetTimeout", __LINE__,  sockGuard->get() )){
+	if( !(*sockGuard) ){
+         fprintf( stderr,
+                  "%s (line %d): ERROR - Socket: Socket not open ",
+                  "Socket",
+                  __LINE__);
 		return false;
 	}
 
@@ -134,7 +181,15 @@ bool Socket::SetTimeout(unsigned long tout){
 }
 
 bool Socket::SendTo(const std::string& buffer){
-	if( !SYSCALL("SendTo", __LINE__,  sockGuard->get() )){
+	if( !(*sockGuard) ){
+         fprintf( stderr,
+                  "%s (line %d): ERROR - Socket: Socket not open ",
+                  "Socket",
+                  __LINE__);
+		return false;
+	}
+	if( sockGuard->get_status() & socket_guard::NOWR ) {
+		fprintf( stderr,"Invalid Operation Send Not Possible: %d\n", sockGuard->get_status());
 		return false;
 	}
 
@@ -175,7 +230,15 @@ bool Socket::SendTo(const std::string& buffer){
 */
 
 bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
-	if( !SYSCALL("RecvFrom", __LINE__,  sockGuard->get() )){
+	if( !(*sockGuard) ){
+         fprintf( stderr,
+                  "%s (line %d): ERROR - Socket: Socket not open ",
+                  "Socket",
+                  __LINE__);
+		return false;
+	}
+	if( sockGuard->get_status() & socket_guard::NORD ) {
+		fprintf( stderr,"Invalid Operation Recv Not Possible: %d\n", sockGuard->get_status());
 		return false;
 	}
 
@@ -199,6 +262,7 @@ bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
 			SYSCALL("recvfrom", __LINE__,  inBytes );
 			return false;
 		}
+		SYSCALL("recvfrom", __LINE__,  inBytes );
 	} while( inBytes > 0 && recvbuflen > 0 && protocol=="tcp" );
 	if(listening && protocol=="udp"){
 		struct addrinfo saddri={0,sadr->sa_family,0,0,sadrLen,sadr,0,0};
@@ -208,6 +272,13 @@ bool Socket::RecvFrom(std::string& buffer, int recvbuflen){
 }
 
 socket_guard Socket::Accept () {
+	if( !(*sockGuard) ){
+         fprintf( stderr,
+                  "%s (line %d): ERROR - Socket: Socket not open ",
+                  "Socket",
+                  __LINE__);
+		return false;
+	}
 	/*
 	** Determine if this is a TCP request or UDP request.
 	*/
@@ -249,10 +320,7 @@ socket_guard Socket::Accept () {
 * Return Value: for TCP: Socket descriptors which has new activity,for UDP: return INVALID_SOCKET
 ******************************************************************************/
 socket_guard Socket::Listen() {
-	std::vector<struct pollfd> desc;
-	int                      newSckt;
-	
-	if( sockGuard->get() < 0 ) { // Socket not open
+	if( !(*sockGuard) ) { // Socket not open   sockGuard->get() < 0
          fprintf( stderr,
                   "%s (line %d): ERROR - Socket: Socket not open ",
                   "Socket",
@@ -260,6 +328,9 @@ socket_guard Socket::Listen() {
 
 		return INVALID_SOCKET;
 	}
+
+	std::vector<struct pollfd> desc;
+	int                      newSckt;
 
 	/*
 	** Initialize the poll(2) array.
@@ -295,24 +366,25 @@ socket_guard Socket::Listen() {
 		** Process sockets with input available.
 		*/
 		int idx = 0;
-		switch ( desc[ idx ].revents ) {
-			case 0:        /* No activity on this socket; try the next. */
-				break;
-			case POLLIN:   /* Network activity.  Go process it.         */
-				desc[ idx ].revents = 0;   /* Clear the returned poll events. */
-				return Accept(); //desc[ idx ].fd
-				break;
+		SetEvent(desc[ idx ].revents);
+		if( desc[ idx ].revents == 0 ) {								// No activity on this socket; try the next.
+			continue;
+		}
+		else if( desc[ idx ].revents == POLLIN ) {					// Network activity.  Go process it.
+			desc[ idx ].revents = 0;   /* Clear the returned poll events. */
+			return Accept(); //desc[ idx ].fd
+		}
+		else {															// Network activity.  Go process it.
+			fprintf( stderr,
+				"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
+				"Socket",
+				__LINE__,
+				desc[ idx ].revents );
 
-			default:       /* Invalid poll events.                      */
-				{
-					fprintf( stderr,
-						"%s (line %d): ERROR - Invalid poll event (0x%02X).\n",
-						"Socket",
-						__LINE__,
-						desc[ idx ].revents );
-					return INVALID_SOCKET;
-				}
-		}  /* End SWITCH on returned poll events. */
+			desc[ idx ].revents = 0;   /* Clear the returned poll events. */
+			return INVALID_SOCKET;
+		}  /* End IF on returned poll events. */
+
 	}  /* End WHILE forever. */
 }  /* End tod() */
 
@@ -338,7 +410,7 @@ bool Socket::OpenServer( ) {
    struct addrinfo  hints    = { .ai_flags  = AI_PASSIVE };   // Server mode.
 //                                 .ai_family = PF_UNSPEC };   // IPv4 or IPv6.
 
-	if( sockGuard->get() != INVALID_SOCKET ) { // Socket already open
+	if( *sockGuard ) { // Socket already open sockGuard->get() != INVALID_SOCKET
          fprintf( stderr,
                   "%s (line %d): ERROR - Socket: %d already open ",
                   "Socket",
@@ -520,7 +592,7 @@ bool Socket::OpenClient() {
 	struct addrinfo *aiHead;
 	struct addrinfo  hints;
 
-	if( sockGuard->get() != INVALID_SOCKET ) { // Socket already open
+	if( *sockGuard ) { // Socket already open sockGuard->get() != INVALID_SOCKET
          fprintf( stderr,
                   "%s (line %d): ERROR - Socket: %d already open ",
                   "Socket",
@@ -727,7 +799,7 @@ bool Socket::PrintAddrInfo( struct addrinfo *sadr ){
 	return true;
 }
 void Socket::SetEvent(int e){
-	sockGuard->SetEvent(e);
+	sockGuard->set_event(e);
 	fprintf( stderr,"\n ******************** \n");
 	fprintf( stderr," Socket %d events start.\n",sockGuard->get());
 	if( e & POLLIN ) {

@@ -124,14 +124,23 @@ bool SYSCALL( const std::string& syscallName, int lineNbr, int status );
 
 void GetDateTime(std::string& dateStr,std::string& timeStr, std::string& msStr, const std::string& datePattern = std::string("%Y/%m/%d"), const std::string& timePattern = std::string("%H:%M:%S"));
 std::string GetDateTimeStr();
+uint64_t get_ss();
+
+
 
 class socket_guard {
+	public:
+	typedef enum {RDWR=0,NORD=1,NOWR=2,NORW=3,ERR=7} socket_status; /* 0000 RDWR 0001 NORD 0010 NOWR 0011 NORW 0111 ERR */
+
+	private:
 		mutable int sock;
 		int event;
+		socket_status status;
+
 	public:
-		socket_guard(int sock=INVALID_SOCKET):sock(sock),event(0){
+		socket_guard(int sock=INVALID_SOCKET):sock(sock),event(0),status(RDWR){
 		};
-		socket_guard(const socket_guard& sg):sock(sg.sock),event(0){
+		socket_guard(const socket_guard& sg):sock(sg.sock),event(sg.event),status(sg.status){
 			sg.sock=INVALID_SOCKET;
 		}
 		socket_guard& operator = (const socket_guard& sg){
@@ -139,6 +148,7 @@ class socket_guard {
 			sock=sg.sock;
 			sg.sock=INVALID_SOCKET;
 			event=sg.event;
+			status=sg.status;
 			return *this;
 		}
 		~socket_guard(){
@@ -147,25 +157,35 @@ class socket_guard {
 		bool close(){
 			fprintf( stderr,"Socket id: %d Closed.\n",sock);
 			bool result = false;
-			if( sock != INVALID_SOCKET ){
+			if( sock >= 0 ){
 				result = SYSCALL( "close", __LINE__, ::close( sock ) );
-				sock = INVALID_SOCKET;
+				sock = -sock;
+				set_status(NORW);
 			}
 			return result;
 		}
 		int get() const {
-			return sock;
+			return (sock<0)?-sock:sock;
 		}
 		int release(){
 			int tmp=sock;
-			sock = INVALID_SOCKET;
+			reset();
 			return tmp;
 		}
-		void reset(){
-			sock = INVALID_SOCKET;
+		void reset(){ sock=INVALID_SOCKET; event=0; status=RDWR;}
+		void set_event(int e) { 
+			event = e; 
+			if( e & (POLLERR|POLLHUP) ){
+				set_status(ERR);
+			}
+			else if( e & POLLRDHUP){
+				set_status(NORD);
+			}
 		}
-		int GetEvent(){return event;}
-		void SetEvent(int e){event=e;}
+		int get_event(){return event;}
+		void set_status(socket_status s) { status = static_cast<socket_status>(status | s); }
+		socket_status get_status(){return status;}
+		operator bool () const {return static_cast<bool>( sock >= 0 );}
 };
 
 class Socket {
@@ -216,9 +236,9 @@ class Socket {
 		bool SetTimeout(unsigned long tout);
 		bool Listening() const {return listening;}
 		const std::string& Protocol() const {return protocol;}
-		int GetEvent(){return sockGuard->GetEvent();}
+		int GetEvent(){return sockGuard->get_event();}
 		void SetEvent(int e);//{sockGuard->SetEvent(e);}
-		operator bool () const {return ( sockGuard->get() >= 0 );}
+		operator bool () const {return static_cast<bool>(*sockGuard);}
 };
 
 #endif //_WIN_SOCKET_H_

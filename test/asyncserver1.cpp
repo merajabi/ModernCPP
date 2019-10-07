@@ -48,13 +48,13 @@ int main(int argc, char **argv) {
 		s2.Open();
 		pool.Add(s2);
 
-		Socket s3(DFLT_HOST,"8080","udp","ipv4",true);
-		s3.Open();
-		pool.Add(s3);
+		//Socket s3(DFLT_HOST,"8080","udp","ipv4",true);
+		//s3.Open();
+		//pool.Add(s3);
 
-		Socket s4(DFLT_HOST,"8080","udp","ipv6",true);
-		s4.Open();
-		pool.Add(s4);
+		//Socket s4(DFLT_HOST,"8080","udp","ipv6",true);
+		//s4.Open();
+		//pool.Add(s4);
 	}
 	{
 		std::vector<Socket> selected;
