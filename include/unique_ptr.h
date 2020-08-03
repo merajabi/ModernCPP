@@ -2,7 +2,7 @@
 #define _ModernCPP_unique_ptr_H_
 
 #include <assert.h>
-#include "type_traits.h"
+#include "typetraits.h"
 
 namespace ModernCPP {
 	template<typename T>
@@ -98,6 +98,6 @@ namespace ModernCPP {
 	T* move (unique_ptr<T>& p){
 		return p.move();
 	}
-};
+}
 #endif //_ModernCPP_unique_ptr_H_
 

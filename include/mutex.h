@@ -1,6 +1,7 @@
 #ifndef _ModernCPP_mutex_H_
 #define _ModernCPP_mutex_H_
-#include "type_traits.h"
+
+#include "typetraits.h"
 
 namespace ModernCPP {
 	class mutex {
@@ -49,7 +50,7 @@ namespace ModernCPP {
 			return m;
 		}
 	};
-};
+}
 
 #endif //_ModernCPP_mutex_H_
 

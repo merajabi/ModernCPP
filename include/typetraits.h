@@ -38,7 +38,7 @@ namespace ModernCPP {
 
 	template< class T >
 	struct remove_cv { 
-		typedef typename ModernCPP::remove_volatile<typename ModernCPP::remove_const<T>::type>::type type;
+		typedef typename remove_volatile<typename remove_const<T>::type>::type type;
 	};
 
 	template< class T >	struct add_cv { typedef const volatile T type; };
@@ -51,7 +51,7 @@ namespace ModernCPP {
 
 	template< class T >
 	struct remove_cvref {
-		typedef typename ModernCPP::remove_cv<typename ModernCPP::remove_reference<T>::type>::type type;
+		typedef typename remove_cv<typename remove_reference<T>::type>::type type;
 	};
 
 	template< class T >
@@ -102,12 +102,12 @@ namespace ModernCPP {
 	template< typename U >
 	reference_wrapper<U> ref(U& x){
 		return reference_wrapper<U>(x);
-	};
+	}
 
 	template< typename U >
 	reference_wrapper<U> ref(reference_wrapper<U> x){
 		return x;
-	};
+	}
 
 	template <typename F,typename U> struct _Bind;
 
@@ -188,6 +188,6 @@ namespace ModernCPP {
 
 	template<typename T> struct autotypeof { typedef T type; };
 
-};
+}
 #endif //_ModernCPP_meta_H_
 

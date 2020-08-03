@@ -1,7 +1,7 @@
 #include <iostream>
 
 #if (__cplusplus < 201103L)
-	#include "type_traits.h"
+	#include "typetraits.h"
 	#include "thread.h"
 	#include "mutex.h"
 	#include "atomic.h"

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <assert.h>
 
 #if (__cplusplus < 201103L)
 	#include "thread.h"
@@ -45,7 +46,7 @@ void inc(unsigned long x){
 }
 
 void incconref(const int& x){
-	for(unsigned long i=0;i<x;i++){
+	for(int i=0;i<x;i++){
 		counter++;
 	}
 }
@@ -97,6 +98,7 @@ int main() {
 		thread t2(inc,x);
 		t1.join();
 		t2.join();
+		assert(counter.load()==20);
 	    std::cout<<counter<<std::endl;
 	}
 	{//test 2
@@ -106,6 +108,7 @@ int main() {
 		thread t2(inc,10);
 		t1.join();
 		t2.join();
+		assert(counter.load()==20);
 	    std::cout<<counter<<std::endl;
 	}
 
@@ -117,6 +120,7 @@ int main() {
 		thread t2(incref,ref(x));
 		t2.join();
 		t1.join();
+		assert(x==12);
 	    std::cout<< x <<std::endl;
 	}
 
@@ -129,6 +133,7 @@ int main() {
 		thread t2(incconref,x);
 		t2.join();
 		t1.join();
+		assert(x==10);
 	    std::cout<< x <<std::endl;
 	}
 
@@ -138,6 +143,7 @@ int main() {
 		void (*fp)(unsigned long) = inc;
 		thread t(fp,10);
 		t.join();
+		assert(counter.load()==10);
 	    std::cout<<counter<<std::endl;
 	}
 
@@ -150,6 +156,7 @@ int main() {
 		thread t2(incSample,obj);
 		t1.join();
 		t2.join();
+		assert(counter.load()==20);
 	    std::cout<<counter<<std::endl;
 	}
 	{	//test 7
@@ -159,6 +166,7 @@ int main() {
 		thread t2(incSample,Sample());
 		t1.join();
 		t2.join();
+		assert(counter.load()==20);
 	    std::cout<<counter<<std::endl;
 	}
 
@@ -170,6 +178,7 @@ int main() {
 		thread t2(incSampleRef,ref(obj));
 		t1.join();
 		t2.join();
+		assert(obj.Get()==50);
 	    std::cout<<obj.Get()<<std::endl;
 	}
 
@@ -181,6 +190,7 @@ int main() {
 		thread t2(incSampleRefConst,obj);
 		t1.join();
 		t2.join();
+		assert(counter.load()==20);
 	    std::cout<<counter<<std::endl;
 	}
 
@@ -190,6 +200,7 @@ int main() {
 		counter=0;
 		thread t1(obj);
  		t1.join();
+		assert(counter.load()==10);
 	    std::cout<<counter<<std::endl;
 	}
 
@@ -205,6 +216,7 @@ int main() {
 		t6.join();
 		t5.join();
 		t4.join();
+		assert(counter.load()==30);
 	    std::cout<<counter<<std::endl;
 		
 	}
