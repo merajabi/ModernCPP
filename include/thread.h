@@ -8,10 +8,6 @@
 #include <exception>
 #include <pthread.h>
 		
-#include <boost/type_index.hpp>
-using boost::typeindex::type_id_with_cvr;
-
-
 namespace ModernCPP {
 	struct system_error : public std::runtime_error {
 		system_error(const std::string& str):std::runtime_error(str){}
@@ -64,8 +60,8 @@ namespace ModernCPP {
 			}
 
 			template<typename FuncType>
-			thread(FuncType functor):threadId(0),data( new ThreadData<FuncType,void>(functor)),status(false){
-				int error = pthread_create( &threadId, NULL, &ThreadData<FuncType,void>::function, *data);
+			thread(FuncType functor):threadId(0),data( new ThreadData<FuncType>(functor)),status(false){
+				int error = pthread_create( &threadId, NULL, &ThreadData<FuncType>::function, *data);
 
 				if(error!=0){
 					throw system_error("thread");

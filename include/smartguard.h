@@ -2,7 +2,9 @@
 #define _ModernCPP_SmartGuard_H_
 
 #include "typetraits.h"
+
 #include <assert.h>
+
 namespace ModernCPP {
 	template<typename T>
 	class SmartGuard {
