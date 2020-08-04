@@ -209,14 +209,15 @@ int main() {
 		counter=0;
 		thread t4((Sample())); //this is to avoid what's known as C++'s most vexing parse: 
 							// without the parentheses, the declaration is taken to be a declaration of a function called t4 
-	    thread t5=thread(Sample());
+
+	    // thread t5 = thread(Sample()); // can not copy construct a thread
 
 	    thread t6(Sample(10));
 
 		t6.join();
-		t5.join();
+		//t5.join();
 		t4.join();
-		assert(counter.load()==30);
+		assert(counter.load()==20);
 	    std::cout<<counter<<std::endl;
 		
 	}

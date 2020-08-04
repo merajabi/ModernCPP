@@ -47,6 +47,9 @@ namespace ModernCPP {
 		mutable SmartGuard<ThreadDataBase> data ;
 		mutable bool status;
 
+			thread(const thread& t);
+			const thread& operator = (const thread& t) const;
+
 		public:
 
 			template<typename FuncType,typename ParamType>
@@ -69,19 +72,17 @@ namespace ModernCPP {
 				status=true;
 			}
 
-			thread(const thread& t):threadId(t.threadId),data(t.data),status(t.status) { // its move constructor
-				t.status=false;
-				t.threadId=-1;
-				t.data=nullptr;
+			thread(const right_reference<thread>& t):threadId(t->threadId),data(refmove(t->data)),status(t->status) { // its move constructor
+				t->threadId=-1;
+				t->status=false;
 			}
 
-			const thread& operator = (const thread& t) const {  // its move assignment operator
-				status=t.status;
-				data=t.data;
-				threadId=t.threadId;
-				t.status=false;
-				t.threadId=-1;
-				t.data=nullptr;
+			const thread& operator = (const right_reference<thread>& t) const {  // its move assignment operator
+				data=refmove(t->data);
+				threadId=t->threadId;
+				t->threadId=-1;
+				status=t->status;
+				t->status=false;
 				return *this;
 			}
 

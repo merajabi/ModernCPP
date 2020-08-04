@@ -10,10 +10,6 @@ namespace ModernCPP {
 	class SmartGuard {
 		mutable T *xPtr;
 
-		public:
-			SmartGuard(T* xp = nullptr){
-				xPtr = xp;
-			}
 			SmartGuard(const SmartGuard &pg){ // its move constructor
 				xPtr = pg.xPtr;
 				pg.xPtr = nullptr;
@@ -24,6 +20,23 @@ namespace ModernCPP {
 				pg.xPtr = nullptr;
 				return *this;
 			}
+
+		public:
+			SmartGuard(T* xp = nullptr){
+				xPtr = xp;
+			}
+
+			SmartGuard(const right_reference<SmartGuard>& pg){ // its move constructor
+				xPtr = pg->xPtr;
+				pg->xPtr = nullptr;
+			}
+			SmartGuard& operator= (const right_reference<SmartGuard>& pg){ //  its move assignment operator
+				assert(xPtr == nullptr);
+				xPtr = pg->xPtr;
+				pg->xPtr = nullptr;
+				return *this;
+			}
+
 			~SmartGuard() {
 				if(xPtr != nullptr){
 					delete xPtr;

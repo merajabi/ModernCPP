@@ -3,6 +3,9 @@
 
 #if (__cplusplus < 201103L)
 	#ifndef nullptr
+		#ifndef NULL
+			#define NULL 0
+		#endif
 		#define nullptr NULL
 	#endif
 	#define AUTO(x,y) autotypeof<__typeof__(y)>::type x = y
@@ -107,6 +110,28 @@ namespace ModernCPP {
 	template< typename U >
 	reference_wrapper<U> ref(reference_wrapper<U> x){
 		return x;
+	}
+
+	template <typename T>
+	class right_reference {
+		T* _ptr;
+	public:
+
+		right_reference(T& u) : _ptr(addressof(u)) {};
+
+		T* operator ->() const {
+			return _ptr;
+		}
+	};
+
+	template< typename U >
+	right_reference<U> refmove(U& u){
+		return right_reference<U>(u);
+	}
+
+	template< typename U >
+	right_reference<U> refmove(right_reference<U> u){
+		return u;
 	}
 
 	template <typename F,typename U> struct _Bind;
