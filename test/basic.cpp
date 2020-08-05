@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include <assert.h>
 
 #if (__cplusplus < 201103L)
@@ -39,8 +40,8 @@ int dec(const std::string& x) {
 }
 */
 
-void inc(unsigned long x){
-	for(unsigned long i=0;i<x;i++){
+void inc(long x){
+	for(long i=0;i<x;i++){
 		counter++;
 	}
 }
@@ -58,18 +59,18 @@ void incref(int& x){
 
 
 class Sample {
-	unsigned long x;
+	long x;
 	public:
-	Sample(unsigned long x=10):x(x){}
+	Sample(long x=10):x(x){}
 	void operator () (){
-		for(unsigned long i=0;i<x;i++){
+		for(long i=0;i<x;i++){
 			counter++;
 		}
 	}
 	void Run (){
 		x+=20;
 	}
-	unsigned long Get() const {return x;}
+	long Get() const {return x;}
 };
 
 void incSampleRef(Sample& obj){
@@ -78,14 +79,40 @@ void incSampleRef(Sample& obj){
 }
 
 void incSample(Sample x){
-	for(unsigned long i=0;i<x.Get();i++){
+	for(long i=0;i<x.Get();i++){
 		counter++;
 	}
 }
 
 void incSampleRefConst(const Sample& x){
-	for(unsigned long i=0;i<x.Get();i++){
+	for(long i=0;i<x.Get();i++){
 		counter++;
+	}
+}
+
+std::vector<SmartGuard<thread> > createList(){
+	std::vector<SmartGuard<thread> > tvec;
+	for(int i=0; i<3; i++){
+		Sample obj(10);
+		SmartGuard<thread> tg ( new thread(obj) );
+		tvec.push_back(refmove(tg));
+
+		//tvec.push_back(new thread(obj));
+	}
+	return tvec;
+}
+void createList(std::vector<SmartGuard<thread> >& tvec){
+	for(int i=0; i<3; i++){
+		Sample obj(10);
+		//SmartGuard<thread> tg ( new thread(obj) );
+		//tvec.push_back(refmove(tg));
+
+		tvec.push_back(new thread(obj));
+	}
+}
+void waitList(const std::vector<SmartGuard<thread> >& tvec){
+	for(int i=0; i<3; i++){
+		tvec[i]->join();
 	}
 }
 
@@ -140,7 +167,7 @@ int main() {
 	{	//test 5
 	    std::cout<<" test 5"<<std::endl;
 		counter=0;
-		void (*fp)(unsigned long) = inc;
+		void (*fp)(long) = inc;
 		thread t(fp,10);
 		t.join();
 		assert(counter.load()==10);
@@ -239,5 +266,34 @@ int main() {
 		t.join();
 	    std::cout<<p->Get()<<std::endl;		
 	}
+
+	{
+		//test 14
+		std::vector<SmartGuard<thread> > tvec;
+		counter=0;
+		for(int i=0; i<3; i++){
+			//Sample obj(10);
+			//SmartGuard<thread> tg ( new thread(obj) );
+			//tvec.push_back(refmove(tg));
+
+			tvec.push_back(new thread(Sample(10)));
+		}
+		for(int i=0; i<3; i++){
+			tvec[i]->join();
+		}
+	    std::cout<<counter<<std::endl;
+	}
+	{
+		//test 14
+		counter=0;
+		std::vector<SmartGuard<thread> > tvec1;
+		createList(tvec1);
+		std::vector<SmartGuard<thread> > tvec2 = createList();
+
+		waitList(tvec2);
+		waitList(tvec1);
+	    std::cout<<counter<<std::endl;
+	}
+
 }
 

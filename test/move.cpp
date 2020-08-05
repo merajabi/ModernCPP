@@ -7,10 +7,8 @@ struct MovableClass {
 	int* data;
 
 	MovableClass():data(0){
-		std::cout << "default" << std::endl;
 	}
 	MovableClass(const int& d){
-		std::cout << "param" << std::endl;
 		data = new int(d);
 	}
 	~MovableClass(){
@@ -18,26 +16,21 @@ struct MovableClass {
 	}
 
 	MovableClass(const MovableClass& mv){
-		std::cout << "Copy" << std::endl;
 		data = new int(*mv.data);
 	}
 	MovableClass& operator=(const MovableClass& mv){
-		std::cout << "Copy=" << std::endl;
 		if (!data) {
 			data = new int();
 		}
-
 		*data = *mv.data; 
 		return *this;
 	}
 
 	MovableClass(const right_reference<MovableClass>& mv){
-		std::cout << "Move" << std::endl;
 		data = mv->data;
 		mv->data = 0;
 	}
 	MovableClass& operator=(const right_reference<MovableClass>& mv){
-		std::cout << "Move=" << std::endl;
 		if (data) {
 			delete data;
 		}
@@ -46,11 +39,13 @@ struct MovableClass {
 		return *this;
 	}
 
-	int get() const {
-		if(!data){
-			return -1;
+	void print() const {
+		if(data){
+			std::cout << *data << std::endl;
 		}
-		return *data;
+		else{
+			std::cout << "empty" << std::endl;
+		}
 	}
 };
 
@@ -71,91 +66,91 @@ int main(){
 	{
 		std::cout << "Test 1" << std::endl;
 		MovableClass mv(10);
-		std::cout << mv.get() << std::endl;
+		mv.print();
 
 		MovableClass mv2(mv);
 
-		std::cout << mv.get() << std::endl;
-		std::cout << mv2.get() << std::endl;
+		mv.print();
+		mv2.print();
 	}
 	{
 		std::cout << "Test 2" << std::endl;
 		MovableClass mv(10);
-		std::cout << mv.get() << std::endl;
+		mv.print();
 
 		MovableClass mv2;
 		mv2 = mv;
 
-		std::cout << mv.get() << std::endl;
-		std::cout << mv2.get() << std::endl;
+		mv.print();
+		mv2.print();
 	}
 
 	{
 		std::cout << "Test 3" << std::endl;
 		MovableClass mv(10);
-		std::cout << mv.get() << std::endl;
+		mv.print();
 
 		MovableClass mv2(refmove(mv));
 
-		std::cout << mv.get() << std::endl;
-		std::cout << mv2.get() << std::endl;
+		mv.print();
+		mv2.print();
 	}
 
 	{
 		std::cout << "Test 4" << std::endl;
 		MovableClass mv(10);
-		std::cout << mv.get() << std::endl;
+		mv.print();
 
 		MovableClass mv2;
 
 		mv2 = refmove(mv);
-		std::cout << mv.get() << std::endl;
-		std::cout << mv2.get() << std::endl;
+		mv.print();
+		mv2.print();
 	}
 
 	{
 		std::cout << "Test 5" << std::endl;
 		MovableClass mv1 = func(20);
-		std::cout << mv1.get() << std::endl;
+		mv1.print();
 
 		MovableClass mv2;
 		mv2 = func(20);
-		std::cout << mv2.get() << std::endl;
+		mv2.print();
 	}
 	{
 		std::cout << "Test 6" << std::endl;
 		MovableClass mv1 = func2(20);
-		std::cout << mv1.get() << std::endl;
+		mv1.print();
 
 		MovableClass mv2;
 		mv2 = func2(20);
-		std::cout << mv2.get() << std::endl;
+		mv2.print();
 	}
 
 	{
 		/*
 		std::cout << "Test 7" << std::endl;
 		MovableClass mv1 = func3(20);
-		std::cout << mv1.get() << std::endl;
+		mv1.print();
 
 		MovableClass mv2;
 		mv2 = func3(20);
-		std::cout << mv2.get() << std::endl;
+		mv2.print();
 		*/
 	}
 
 	{
 		std::cout << "Test 6" << std::endl;
 		const MovableClass mv(10);
-		std::cout << mv.get() << std::endl;
+		mv.print();
 
 		MovableClass mv2;
 
 		// this must give us error
 		//mv2 = refmove(mv);
 
-		std::cout << mv.get() << std::endl;
-		std::cout << mv2.get() << std::endl;
+		mv.print();
+		mv2.print();
 	}
 
 }

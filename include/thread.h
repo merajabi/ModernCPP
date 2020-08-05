@@ -24,7 +24,7 @@ namespace ModernCPP {
 
 		ThreadData(FuncType func,ParamType param):func(func),param(param){};
 
-		static void* function(void *data){
+		static void* routine(void *data){
 			((ThreadData*)data)->func( ((ThreadData*)data)->param );
 			return 0;
 		}
@@ -36,7 +36,7 @@ namespace ModernCPP {
 
 		ThreadData(FuncType func):func(func){};
 
-		static void* function(void *data){
+		static void* routine(void *data){
 			((ThreadData*)data)->func( );
 			return 0;
 		}
@@ -47,72 +47,72 @@ namespace ModernCPP {
 		mutable SmartGuard<ThreadDataBase> data ;
 		mutable bool status;
 
-			thread(const thread& t);
-			const thread& operator = (const thread& t) const;
+		thread(const thread& t);
+		const thread& operator = (const thread& t) const;
 
-		public:
+	public:
 
-			template<typename FuncType,typename ParamType>
-			thread(FuncType functor,ParamType param):threadId(0),data( new ThreadData<FuncType,ParamType>(functor,param) ),status(false){
-				int error = pthread_create( &threadId, NULL, &ThreadData<FuncType,ParamType>::function, *data);
+		template<typename FuncType,typename ParamType>
+		thread(FuncType functor,ParamType param):threadId(0),data( new ThreadData<FuncType,ParamType>(functor,param) ),status(false){
+			int error = pthread_create( &threadId, NULL, &ThreadData<FuncType,ParamType>::routine, *data);
 
-				if(error!=0){
-					throw system_error("thread");
-				}
-				status=true;
+			if(error!=0){
+				throw system_error("thread");
 			}
+			status=true;
+		}
 
-			template<typename FuncType>
-			thread(FuncType functor):threadId(0),data( new ThreadData<FuncType>(functor)),status(false){
-				int error = pthread_create( &threadId, NULL, &ThreadData<FuncType>::function, *data);
+		template<typename FuncType>
+		thread(FuncType functor):threadId(0),data( new ThreadData<FuncType>(functor)),status(false){
+			int error = pthread_create( &threadId, NULL, &ThreadData<FuncType>::routine, *data);
 
-				if(error!=0){
-					throw system_error("thread");
-				}
-				status=true;
+			if(error!=0){
+				throw system_error("thread");
 			}
+			status=true;
+		}
 
-			thread(const right_reference<thread>& t):threadId(t->threadId),data(refmove(t->data)),status(t->status) { // its move constructor
-				t->threadId=-1;
-				t->status=false;
-			}
+		thread(const right_reference<thread>& t):threadId(t->threadId),data(refmove(t->data)),status(t->status) { // its move constructor
+			t->threadId=-1;
+			t->status=false;
+		}
 
-			const thread& operator = (const right_reference<thread>& t) const {  // its move assignment operator
-				data=refmove(t->data);
-				threadId=t->threadId;
-				t->threadId=-1;
-				status=t->status;
-				t->status=false;
-				return *this;
-			}
+		const thread& operator = (const right_reference<thread>& t) const {  // its move assignment operator
+			data=refmove(t->data);
+			threadId=t->threadId;
+			t->threadId=-1;
+			status=t->status;
+			t->status=false;
+			return *this;
+		}
 
-			~thread(){
-				if(status){
-					pthread_cancel(threadId);
-					status=false;
-					std::terminate();
-				}
-			}
-
-			void join() const {
-				if(!status){
-					throw system_error("joinable");
-				}
-				pthread_join( threadId, NULL);
+		~thread(){
+			if(status){
+				pthread_cancel(threadId);
 				status=false;
+				std::terminate();
 			}
+		}
 
-			void detach() const {
-				if(!status){
-					throw system_error("joinable");
-				}
-				pthread_detach(threadId);
-				status=false;
+		void join() const {
+			if(!status){
+				throw system_error("joinable");
 			}
+			pthread_join( threadId, NULL);
+			status=false;
+		}
 
-			bool joinable() const {
-				return status;
-			}					
+		void detach() const {
+			if(!status){
+				throw system_error("joinable");
+			}
+			pthread_detach(threadId);
+			status=false;
+		}
+
+		bool joinable() const {
+			return status;
+		}					
 	};
 
 }
