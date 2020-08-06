@@ -161,16 +161,20 @@ namespace ModernCPP {
 			return result;
 		}
 	};
+
+	//specilization for char, int,long,unsigned , void* ... 
 /*
 	template <>
-	class atomic<int,long,void* ... > {
+	class atomic<unsigned long> { 
+	typedef unsigned long T;
 	private:
+		
 		mutex m;
 		T obj;
 		atomic( const atomic& val );
 		atomic& operator= ( const atomic& val );
 	public:
-		atomic():obj{};
+		atomic():obj(){};
 		atomic( const T& val ) {
 			lock_guard<mutex> lk(m);
 			obj = val;
@@ -182,74 +186,75 @@ namespace ModernCPP {
 		    return val;
 		}
 
-		operator T() {
-			lock_guard<mutex> lk(m);
-			T val=obj;
-			return val;
-		}
-
-		T load(){
-			lock_guard<mutex> lk(m);
-			T val = obj;
-			return val;
-		}
 		void store(const T& val){
 			lock_guard<mutex> lk(m);
 			obj = val;
 		}
 
+		operator T() {
+			lock_guard<mutex> lk(m);
+			return obj;
+		}
+
+		T load(){
+			lock_guard<mutex> lk(m);
+			return obj;
+		}
+
 		T operator++() {
-			__sync_synchronize();   // (I) mfence
-		    T val = __sync_add_and_fetch( &obj, (T)1 ); // lock xadd
-			__sync_synchronize();   // (II) mfence
+			__sync_synchronize();
+		    T val = __sync_add_and_fetch( &obj, (T)1 );
+			__sync_synchronize();
 			return val;
 		}
 
 		T operator++( int ) {
-			__sync_synchronize();   // (I) mfence
-		    T val = __sync_fetch_and_add( &obj, (T)1 ); // lock xadd
-			__sync_synchronize();   // (II) mfence
+			__sync_synchronize();
+		    T val = __sync_fetch_and_add( &obj, (T)1 );
+			__sync_synchronize();
 			return val;
 		}
 
 		T operator+=(const T& val ) {
-			__sync_synchronize();   // (I) mfence
-		    return __sync_add_and_fetch( &obj, val ); // lock xadd
-			__sync_synchronize();   // (II) mfence
+			__sync_synchronize();
+		    T res = __sync_add_and_fetch( &obj, val );
+			__sync_synchronize();
+			return res;	
 		}
 
 		T operator--() {
-			__sync_synchronize();   // (I) mfence
-		    return __sync_sub_and_fetch( &obj, (T)1 ); // lock xadd
-			__sync_synchronize();   // (II) mfence
+			__sync_synchronize();
+		    T val = __sync_sub_and_fetch( &obj, (T)1 );
+			__sync_synchronize();
+			return val;
 		}
 
 		T operator--( int ) {
-			__sync_synchronize();   // (I) mfence
-		    return __sync_fetch_and_sub( &obj, (T)1 ); // lock xadd
+			__sync_synchronize();
+		    T val = __sync_fetch_and_sub( &obj, (T)1 );
+			return val;
 		}
 
 		T operator-=(const T& val ) {
-			__sync_synchronize();   // (I) mfence
-		    return __sync_sub_and_fetch( &obj, val ); // lock xadd
-			__sync_synchronize();   // (II) mfence
+			__sync_synchronize();
+		    T res = __sync_sub_and_fetch( &obj, val );
+			__sync_synchronize();
+			return res;
 		}
 
 		bool operator==(const T& val ) {
-		  //  return __sync_bool_compare_and_swap( &obj, val, val); // lock cmpxchg    BYTE PTR bo[rip], dl
-			return compare_exchange_weak(val,val);
+			lock_guard<mutex> lk(m);
+			return (obj == val);
 		}
 		bool operator!=(const T& val ) {
-		    return !__sync_bool_compare_and_swap( &obj, val, val);// lock cmpxchg    BYTE PTR bo[rip], dl
-			return compare_exchange_weak(val,val);
+			lock_guard<mutex> lk(m);
+			return (obj != val);
 		}
 
-		// Perform an atomic CAS operation
-		// returning the value before the operation
 		bool compare_exchange_weak( const T& oldVal, const T& newVal ) {
-			__sync_synchronize();   // (I) mfence
+			__sync_synchronize();
 		    bool result = ( __sync_val_compare_and_swap( &obj, oldVal, newVal ) == oldVal );// lock cmpxchg    DWORD PTR obj[rip], edx
-			__sync_synchronize();   // (II) mfence
+			__sync_synchronize();
 			return result;
 		}
 	};
